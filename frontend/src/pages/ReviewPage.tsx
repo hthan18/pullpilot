@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { authAPI, reviewAPI } from '../services/api';
-import axios from 'axios';
 
 export default function ReviewPage() {
   const navigate = useNavigate();
