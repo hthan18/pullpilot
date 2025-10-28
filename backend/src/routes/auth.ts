@@ -76,8 +76,8 @@ router.get('/github/callback', async (req, res) => {
 
     // Redirect to frontend with token
     res.redirect(`${process.env.CLIENT_URL}?token=${jwtToken}`);
-  } catch (error) {
-    console.error('GitHub OAuth error:', error);
+  } catch (error: any) {
+    console.error('GitHub OAuth error:', error.response?.data || error.message);
     res.status(500).json({ error: 'Authentication failed' });
   }
 });
