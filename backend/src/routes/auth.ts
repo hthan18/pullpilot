@@ -101,7 +101,7 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res) => {
   }
 });
 
-// Logout (client-side will delete token, this is just for consistency)
+// Logout
 router.post('/logout', (req, res) => {
   res.json({ message: 'Logged out successfully' });
 });
