@@ -1,11 +1,9 @@
 import express from 'express';
 import axios from 'axios';
-import OpenAI from 'openai';
 import pool from '../config/db';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 
 const router = express.Router();
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 router.use(authenticateToken);
 
@@ -85,7 +83,7 @@ router.post('/', async (req: AuthRequest, res) => {
 
     const review = reviewResult.rows[0];
 
-    // Analyze code with OpenAI (async - don't wait)
+    // Analyze code with demo AI (async - don't wait)
     analyzeCodeWithAI(review.id, diff, pr.title).catch(console.error);
 
     res.status(201).json(review);
@@ -98,61 +96,97 @@ router.post('/', async (req: AuthRequest, res) => {
   }
 });
 
-// Analyze code with OpenAI
+// Analyze code with demo AI responses
 async function analyzeCodeWithAI(reviewId: number, diff: string, prTitle: string) {
   try {
-    // Limit diff size to avoid token limits (max ~3000 lines)
-    const truncatedDiff = diff.split('\n').slice(0, 3000).join('\n');
-
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
-      messages: [
+    // DEMO MODE: Return realistic mock analysis
+    const demoAnalysis = {
+      security: [
         {
-          role: 'system',
-          content: `You are an expert code reviewer. Analyze the following pull request diff and provide:
-1. Security vulnerabilities
-2. Code quality issues
-3. Best practice violations
-4. Performance concerns
-5. Suggestions for improvement
-
-Format your response as JSON with these keys: security, quality, bestPractices, performance, suggestions.
-Each should be an array of objects with "issue" and "description" fields.`
+          issue: "SQL Injection Vulnerability",
+          description: "The code uses string concatenation for API URL construction ('/api/search?q=' + query), which can lead to injection attacks. Use URL parameters or proper sanitization."
         },
         {
-          role: 'user',
-          content: `PR Title: ${prTitle}\n\nCode Diff:\n${truncatedDiff}`
+          issue: "No Input Validation",
+          description: "User input is not validated or sanitized before being used in DOM operations and API calls. This could allow XSS attacks."
         }
       ],
-      temperature: 0.3,
-      max_tokens: 2000
-    });
+      quality: [
+        {
+          issue: "TypeScript 'any' Types",
+          description: "Multiple uses of 'any' type (props: any, note: any) defeats the purpose of TypeScript. Define proper interfaces for better type safety."
+        },
+        {
+          issue: "Direct DOM Manipulation",
+          description: "Using document.querySelectorAll and direct style manipulation is an anti-pattern in React. Use React state and conditional rendering instead."
+        },
+        {
+          issue: "Unused Variable",
+          description: "The fetchSearchResults function is defined but never called, indicating dead code that should be removed."
+        }
+      ],
+      bestPractices: [
+        {
+          issue: "Missing Error Handling",
+          description: "The fetchSearchResults async function has no try-catch block. This will cause unhandled promise rejections if the API call fails."
+        },
+        {
+          issue: "Missing Accessibility Attributes",
+          description: "Input and button elements lack proper ARIA labels and accessibility attributes. Add aria-label or proper label elements."
+        },
+        {
+          issue: "No PropTypes Validation",
+          description: "Component accepts 'any' props without validation. Define a proper TypeScript interface for props."
+        }
+      ],
+      performance: [
+        {
+          issue: "Inefficient DOM Queries",
+          description: "Querying all '.note' elements on every search is inefficient. Consider using React's virtual DOM with filtered rendering for better performance."
+        },
+        {
+          issue: "Missing Debouncing",
+          description: "Search input triggers on every keystroke without debouncing, which could cause performance issues with large datasets."
+        }
+      ],
+      suggestions: [
+        {
+          issue: "Use React State Management",
+          description: "Replace DOM manipulation with React state and filtered rendering. Example: const [filteredNotes, setFilteredNotes] = useState(notes.filter(...))"
+        },
+        {
+          issue: "Add Proper TypeScript Types",
+          description: "Define interfaces: interface SearchBarProps { onSearch: (query: string) => void; } and use them throughout the component."
+        },
+        {
+          issue: "Implement Debouncing",
+          description: "Add debouncing to the search input using useDebounce hook or lodash.debounce to reduce unnecessary re-renders and API calls."
+        },
+        {
+          issue: "Improve Error Handling",
+          description: "Wrap async operations in try-catch blocks and display user-friendly error messages when operations fail."
+        }
+      ]
+    };
 
-    const analysis = completion.choices[0].message.content;
-    
-    // Try to parse as JSON, fallback to raw text
-    let analysisResult;
-    try {
-      analysisResult = JSON.parse(analysis || '{}');
-    } catch {
-      analysisResult = { rawAnalysis: analysis };
-    }
+    // Simulate processing delay (remove this if you want instant results)
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
-    // Update review with results
+    // Update review with demo results
     await pool.query(
       `UPDATE reviews 
        SET status = 'completed', 
            analysis_result = $1, 
            completed_at = NOW()
        WHERE id = $2`,
-      [JSON.stringify(analysisResult), reviewId]
+      [JSON.stringify(demoAnalysis), reviewId]
     );
 
-    console.log(`✅ Review ${reviewId} completed`);
+    console.log(`✅ Review ${reviewId} completed (DEMO MODE)`);
+    
   } catch (error) {
     console.error(`❌ Error analyzing review ${reviewId}:`, error);
     
-    // Mark as failed
     await pool.query(
       `UPDATE reviews 
        SET status = 'failed', 
