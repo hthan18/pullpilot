@@ -48,7 +48,7 @@ export default function Dashboard() {
       <nav style={{ background: '#1f2937', borderBottom: '1px solid #374151' }}>
         <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', height: '64px', alignItems: 'center' }}>
-            <h1 style={{ fontSize: '20px', fontWeight: 'bold', color: 'white', margin: 0 }}>DevFlow</h1>
+            <h1 style={{ fontSize: '20px', fontWeight: 'bold', color: 'white', margin: 0 }}>PullPilot</h1>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               <Link to="/repositories" style={{ color: '#d1d5db', textDecoration: 'none', padding: '8px 12px', fontSize: '14px' }}>
                 Repositories

@@ -88,7 +88,7 @@ export default function Repositories() {
         <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', height: '64px', alignItems: 'center' }}>
             <Link to="/dashboard" style={{ fontSize: '20px', fontWeight: 'bold', color: 'white', textDecoration: 'none' }}>
-              DevFlow
+              PullPilot
             </Link>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               <Link to="/dashboard" style={{ color: '#d1d5db', textDecoration: 'none', padding: '8px 12px', fontSize: '14px' }}>
