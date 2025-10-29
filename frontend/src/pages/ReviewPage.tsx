@@ -1,188 +1,106 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
-import { reviewAPI } from "../services/api";
+import { useParams, useNavigate } from "react-router-dom";
+import api from "../services/api";
+
+interface Review {
+  id: number;
+  pr_number: number;
+  pr_title: string;
+  status: string;
+  analysis_result?: any;
+  created_at: string;
+  completed_at?: string;
+}
 
 export default function ReviewPage() {
   const { repoId } = useParams();
-  const [reviews, setReviews] = useState<any[]>([]);
+  const navigate = useNavigate();
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchReviews = async () => {
       try {
-        const res = await reviewAPI.getByRepository(repoId!);
+        const res = await api.get(`/reviews/repository/${repoId}`);
         setReviews(res.data);
-      } catch (err) {
+      } catch (err: any) {
         console.error("Error fetching reviews:", err);
-        setError("Failed to load reviews");
+        setError("Failed to fetch reviews");
       } finally {
         setLoading(false);
       }
     };
-
     fetchReviews();
   }, [repoId]);
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#111827] text-white">
+        Loading reviews...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#111827] text-red-400">
+        {error}
+      </div>
+    );
+  }
+
   return (
-    <div style={{ background: "#111827", minHeight: "100vh" }}>
-      {/* Navbar */}
-      <nav style={{ background: "#1f2937", borderBottom: "1px solid #374151" }}>
-        <div
-          style={{
-            maxWidth: "1280px",
-            margin: "0 auto",
-            padding: "0 24px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            height: "64px",
-          }}
-        >
-          <Link
-            to="/dashboard"
-            style={{
-              fontSize: "20px",
-              fontWeight: "bold",
-              color: "white",
-              textDecoration: "none",
-            }}
-          >
-            PullPilot
-          </Link>
-          <Link
-            to="/repositories"
-            style={{
-              color: "#d1d5db",
-              textDecoration: "none",
-              fontSize: "14px",
-              background: "#374151",
-              padding: "8px 12px",
-              borderRadius: "6px",
-            }}
-          >
-            Back to Repositories
-          </Link>
-        </div>
-      </nav>
+    <div className="min-h-screen bg-[#111827] text-white px-6 py-10">
+      {/* Back Button */}
+      <button
+        onClick={() => navigate("/repositories")}
+        className="text-blue-400 hover:text-blue-500 text-sm mb-6"
+      >
+        ← Back to Repositories
+      </button>
 
-      {/* Main Content */}
-      <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "32px 24px" }}>
-        <h1
-          style={{
-            fontSize: "28px",
-            fontWeight: "bold",
-            color: "white",
-            marginBottom: "8px",
-          }}
-        >
-          Code Reviews
-        </h1>
-        <p style={{ color: "#9ca3af", marginBottom: "24px" }}>
-          Analyze pull requests with AI-powered code review.
-        </p>
+      <h1 className="text-3xl font-bold mb-6">Code Reviews</h1>
 
-        {loading && (
-          <div style={{ color: "#9ca3af", textAlign: "center", marginTop: "40px" }}>
-            Loading reviews...
-          </div>
-        )}
-
-        {error && (
-          <div style={{ color: "#ef4444", textAlign: "center", marginTop: "40px" }}>
-            {error}
-          </div>
-        )}
-
-        {!loading && !error && reviews.length === 0 && (
-          <div style={{ color: "#9ca3af", textAlign: "center", marginTop: "40px" }}>
-            No reviews yet for this repository.
-          </div>
-        )}
-
-        {!loading &&
-          !error &&
-          reviews.map((review) => (
+      {reviews.length === 0 ? (
+        <p className="text-gray-400">No reviews yet for this repository.</p>
+      ) : (
+        <div className="space-y-6">
+          {reviews.map((review) => (
             <div
               key={review.id}
-              style={{
-                background: "#1f2937",
-                borderRadius: "8px",
-                padding: "24px",
-                border: "1px solid #374151",
-                marginBottom: "16px",
-              }}
+              className="bg-[#1f2937] rounded-xl p-5 border border-[#374151]"
             >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <div>
-                  <h3
-                    style={{
-                      color: "white",
-                      fontWeight: "600",
-                      fontSize: "18px",
-                      marginBottom: "4px",
-                    }}
-                  >
-                    PR #{review.pr_number}: {review.pr_title}
-                  </h3>
-                  <p style={{ color: "#9ca3af", fontSize: "14px", margin: 0 }}>
-                    Status:{" "}
-                    <span
-                      style={{
-                        color:
-                          review.status === "completed"
-                            ? "#10b981"
-                            : review.status === "failed"
-                            ? "#ef4444"
-                            : "#fbbf24",
-                      }}
-                    >
-                      {review.status}
-                    </span>
-                  </p>
-                  <p
-                    style={{
-                      color: "#9ca3af",
-                      fontSize: "13px",
-                      marginTop: "4px",
-                    }}
-                  >
-                    Created at:{" "}
-                    {new Date(review.created_at).toLocaleString(undefined, {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    })}
-                  </p>
-                </div>
+              <h2 className="text-xl font-semibold">
+                PR #{review.pr_number}: {review.pr_title}
+              </h2>
+              <p className="text-gray-400 text-sm mt-1">
+                Status:{" "}
+                <span
+                  className={
+                    review.status === "completed"
+                      ? "text-green-400"
+                      : review.status === "failed"
+                      ? "text-red-400"
+                      : "text-yellow-400"
+                  }
+                >
+                  {review.status}
+                </span>
+              </p>
 
-                {review.status === "completed" && (
-                  <button
-                    onClick={() =>
-                      alert(JSON.stringify(review.analysis_result, null, 2))
-                    }
-                    style={{
-                      background: "#2563eb",
-                      color: "white",
-                      border: "none",
-                      padding: "8px 16px",
-                      borderRadius: "6px",
-                      cursor: "pointer",
-                      fontSize: "14px",
-                    }}
-                  >
-                    View Analysis
-                  </button>
-                )}
-              </div>
+              {review.analysis_result && (
+                <div className="mt-4">
+                  <h3 className="text-lg font-medium mb-2">Analysis Result</h3>
+                  <pre className="bg-[#111827] text-gray-300 text-sm p-3 rounded-md overflow-auto max-h-96">
+                    {JSON.stringify(review.analysis_result, null, 2)}
+                  </pre>
+                </div>
+              )}
             </div>
           ))}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
