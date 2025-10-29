@@ -210,9 +210,9 @@ export default function Repositories() {
                       </div>
                       <div style={{ minWidth: 0 }}>
                         <p style={{ color: 'white', fontWeight: '500', margin: 0, marginBottom: '4px' }}>{repo.full_name}</p>
-                        <p style={{ color: '#9ca3af', fontSize: '14px', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <p style={{color: '#9ca3af', fontSize: '14px', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', maxWidth: '100%',}}>
                           {repo.description || 'No description'}
-                        </p>
+                          </p>
                       </div>
                     </div>
                     {repo.private && (
