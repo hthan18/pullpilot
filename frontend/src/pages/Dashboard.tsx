@@ -50,9 +50,34 @@ export default function Dashboard() {
           <div style={{ display: 'flex', justifyContent: 'space-between', height: '64px', alignItems: 'center' }}>
             <h1 style={{ fontSize: '20px', fontWeight: 'bold', color: 'white', margin: 0 }}>PullPilot</h1>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <Link to="/repositories" style={{ color: '#d1d5db', textDecoration: 'none', padding: '8px 12px', fontSize: '14px' }}>
+              
+              {/* Added Dashboard button */}
+              <Link
+                to="/dashboard"
+                style={{
+                  color: window.location.pathname === '/dashboard' ? 'white' : '#d1d5db',
+                  textDecoration: 'none',
+                  padding: '8px 12px',
+                  fontSize: '14px',
+                  fontWeight: window.location.pathname === '/dashboard' ? '600' : '400'
+                }}
+              >
+                Dashboard
+              </Link>
+
+              <Link
+                to="/repositories"
+                style={{
+                  color: window.location.pathname.startsWith('/repositories') ? 'white' : '#d1d5db',
+                  textDecoration: 'none',
+                  padding: '8px 12px',
+                  fontSize: '14px',
+                  fontWeight: window.location.pathname.startsWith('/repositories') ? '600' : '400'
+                }}
+              >
                 Repositories
               </Link>
+
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <img src={user?.avatar_url} alt={user?.username} style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
                 <span style={{ color: '#d1d5db', fontSize: '14px' }}>{user?.username}</span>
@@ -172,7 +197,7 @@ export default function Dashboard() {
                       </div>
                     </div>
                     <Link to={`/repositories/${repo.id}/reviews`} style={{ color: '#3b82f6', fontSize: '14px', fontWeight: '500', textDecoration: 'none' }}>
-                    View Reviews →
+                      View Reviews →
                     </Link>
                   </div>
                 ))}
