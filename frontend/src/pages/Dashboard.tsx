@@ -45,93 +45,25 @@ export default function Dashboard() {
   return (
     <div style={{ minHeight: '100vh', background: '#111827' }}>
       {/* Navbar */}
-      {/* Navbar */}
-<nav style={{ background: '#1f2937', borderBottom: '1px solid #374151' }}>
-  <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 24px' }}>
-    <div
-      style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        height: '64px',
-        alignItems: 'center',
-      }}
-    >
-      <h1
-        style={{
-          fontSize: '20px',
-          fontWeight: 'bold',
-          color: 'white',
-          margin: 0,
-        }}
-      >
-        PullPilot
-      </h1>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        {/* Dashboard link */}
-        <Link
-          to="/dashboard"
-          style={{
-            color:
-              location.pathname === '/dashboard' ? '#3b82f6' : '#d1d5db',
-            textDecoration: 'none',
-            padding: '8px 12px',
-            fontSize: '14px',
-            fontWeight: location.pathname === '/dashboard' ? '600' : '500',
-            transition: 'color 0.2s',
-          }}
-        >
-          Dashboard
-        </Link>
-
-        {/* Repositories link */}
-        <Link
-          to="/repositories"
-          style={{
-            color:
-              location.pathname.startsWith('/repositories')
-                ? '#3b82f6'
-                : '#d1d5db',
-            textDecoration: 'none',
-            padding: '8px 12px',
-            fontSize: '14px',
-            fontWeight: location.pathname.startsWith('/repositories')
-              ? '600'
-              : '500',
-            transition: 'color 0.2s',
-          }}
-        >
-          Repositories
-        </Link>
-
-        {/* User info + Logout */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <img
-            src={user?.avatar_url}
-            alt={user?.username}
-            style={{ width: '32px', height: '32px', borderRadius: '50%' }}
-          />
-          <span style={{ color: '#d1d5db', fontSize: '14px' }}>
-            {user?.username}
-          </span>
-          <button
-            onClick={handleLogout}
-            style={{
-              color: '#9ca3af',
-              background: 'none',
-              border: 'none',
-              fontSize: '14px',
-              cursor: 'pointer',
-            }}
-          >
-            Logout
-          </button>
+      <nav style={{ background: '#1f2937', borderBottom: '1px solid #374151' }}>
+        <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', height: '64px', alignItems: 'center' }}>
+            <h1 style={{ fontSize: '20px', fontWeight: 'bold', color: 'white', margin: 0 }}>PullPilot</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <Link to="/repositories" style={{ color: '#d1d5db', textDecoration: 'none', padding: '8px 12px', fontSize: '14px' }}>
+                Repositories
+              </Link>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <img src={user?.avatar_url} alt={user?.username} style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
+                <span style={{ color: '#d1d5db', fontSize: '14px' }}>{user?.username}</span>
+                <button onClick={handleLogout} style={{ color: '#9ca3af', background: 'none', border: 'none', fontSize: '14px', cursor: 'pointer' }}>
+                  Logout
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
-  </div>
-</nav>
-
+      </nav>
 
       {/* Main Content */}
       <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '32px 24px' }}>
