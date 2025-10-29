@@ -27,14 +27,14 @@ export default function Login() {
   const handleGitHubLogin = async () => {
   setLoading(true);
   try {
-    const { data } = await authAPI.getGitHubAuthUrl();
-    if (data?.url) {
-      window.location.href = data.url;
-    } else {
-      console.error('No GitHub URL returned from backend', data);
-      alert('Login failed: GitHub URL not provided');
-      setLoading(false);
-    }
+    const githubUrl = await authAPI.getGitHubAuthUrl();
+if (githubUrl) {
+  window.location.href = githubUrl;
+} else {
+  console.error('No GitHub URL returned from backend');
+  alert('Login failed: GitHub URL not provided');
+  setLoading(false);
+}
   } catch (error) {
     console.error('Login error:', error);
     alert('Login error. Check console.');
