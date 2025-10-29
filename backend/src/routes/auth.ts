@@ -7,7 +7,7 @@ import { authenticateToken, AuthRequest } from '../middleware/auth';
 const router = express.Router();
 
 // GitHub OAuth login - redirect user to GitHub
-router.get('/github', (req, res) => {
+router.get('/github', (_req, res) => {
   const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&scope=repo,user:email`;
   res.json({ url: githubAuthUrl });
 });
@@ -27,24 +27,22 @@ router.get('/github/callback', async (req, res) => {
       {
         client_id: process.env.GITHUB_CLIENT_ID,
         client_secret: process.env.GITHUB_CLIENT_SECRET,
-        code
+        code,
       },
-      {
-        headers: { Accept: 'application/json' }
-      }
+      { headers: { Accept: 'application/json' } }
     );
 
     const accessToken = tokenResponse.data.access_token;
 
     // Get user info from GitHub
     const userResponse = await axios.get('https://api.github.com/user', {
-      headers: { Authorization: `Bearer ${accessToken}` }
+      headers: { Authorization: `Bearer ${accessToken}` },
     });
 
     const githubUser = userResponse.data;
 
-    // Check if user exists in our database
-    let userResult = await pool.query(
+    // Check if user exists in database
+    const userResult = await pool.query(
       'SELECT * FROM users WHERE github_id = $1',
       [githubUser.id.toString()]
     );
@@ -55,11 +53,17 @@ router.get('/github/callback', async (req, res) => {
       // Create new user
       const insertResult = await pool.query(
         'INSERT INTO users (github_id, username, email, avatar_url, access_token) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-        [githubUser.id.toString(), githubUser.login, githubUser.email, githubUser.avatar_url, accessToken]
+        [
+          githubUser.id.toString(),
+          githubUser.login,
+          githubUser.email,
+          githubUser.avatar_url,
+          accessToken,
+        ]
       );
       userId = insertResult.rows[0].id;
     } else {
-      // Update existing user's access token
+      // Update existing user's access token + avatar
       userId = userResult.rows[0].id;
       await pool.query(
         'UPDATE users SET access_token = $1, avatar_url = $2 WHERE id = $3',
@@ -67,22 +71,30 @@ router.get('/github/callback', async (req, res) => {
       );
     }
 
-    // Generate JWT token
+    // Generate JWT
     const jwtToken = jwt.sign(
       { userId },
       process.env.JWT_SECRET || 'your-secret-key',
       { expiresIn: '7d' }
     );
 
-    // Redirect to frontend with token
-    res.redirect(`${process.env.CLIENT_URL}?token=${jwtToken}`);
+    // Store JWT in HTTP-only cookie (persistent login)
+    res.cookie('token', jwtToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'none',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
+    // Redirect to dashboard directly
+    res.redirect(`${process.env.CLIENT_URL}/dashboard`);
   } catch (error: any) {
     console.error('GitHub OAuth error:', error.response?.data || error.message);
     res.status(500).json({ error: 'Authentication failed' });
   }
 });
 
-// Get current user info
+//Get current user info (reads from cookie via middleware)
 router.get('/me', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const result = await pool.query(
@@ -101,8 +113,13 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res) => {
   }
 });
 
-// Logout
-router.post('/logout', (req, res) => {
+//Logout - clear cookie
+router.post('/logout', (_req, res) => {
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'none',
+  });
   res.json({ message: 'Logged out successfully' });
 });
 
