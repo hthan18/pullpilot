@@ -1,22 +1,29 @@
-import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect } from "react";
 
 export default function AuthRedirect() {
-  const navigate = useNavigate();
-
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
+    const token = params.get("token");
+
     if (token) {
-      localStorage.setItem('token', token);
-      navigate('/dashboard');
+      // Store token immediately
+      localStorage.setItem("token", token);
+      //Redirect cleanly — reload the page so ProtectedRoute runs with token present
+      window.location.href = "/dashboard";
     } else {
-      navigate('/');
+      window.location.href = "/";
     }
-  }, [navigate]);
+  }, []);
 
   return (
-    <div style={{ color: 'white', textAlign: 'center', marginTop: '40px' }}>
+    <div
+      style={{
+        color: "white",
+        textAlign: "center",
+        marginTop: "100px",
+        fontSize: "18px",
+      }}
+    >
       Redirecting...
     </div>
   );

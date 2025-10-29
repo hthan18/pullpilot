@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard';
 import Repositories from './pages/Repositories';
 import ReviewPage from './pages/ReviewPage';
 import Login from './pages/Login';
+import AuthRedirect from './pages/AuthRedirect';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = localStorage.getItem('token');
@@ -16,6 +17,10 @@ export default function App() {
     <Router>
       <Routes>
         <Route path="/" element={<Login />} />
+
+        {/* This handles GitHub callback and prevents infinite loop */}
+        <Route path="/auth/callback" element={<AuthRedirect />} />
+
         <Route
           path="/dashboard"
           element={
