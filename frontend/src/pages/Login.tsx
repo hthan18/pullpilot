@@ -23,9 +23,8 @@ export default function Login() {
   const handleGitHubLogin = async () => {
     setLoading(true);
     try {
-      const response = await authAPI.getGitHubAuthUrl();
-      // Redirect to GitHub login
-      window.location.href = response.data.url;
+      const githubUrl = await authAPI.getGitHubAuthUrl();
+      window.location.href = githubUrl;
     } catch (error) {
       console.error('Login error:', error);
       setLoading(false);
