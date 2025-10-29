@@ -12,7 +12,7 @@ export default function Login() {
     const token = params.get('token');
     if (token) {
       localStorage.setItem('token', token);
-      window.history.replaceState({}, '', '/'); // remove ?token from URL
+      window.history.replaceState({}, '', '/dashboard'); // remove ?token from URL
       navigate('/dashboard');
     }
   }, [navigate]);
