@@ -17,10 +17,9 @@ export default function Dashboard() {
 
   const loadData = async () => {
   try {
-    const [userRes, reposRes, issuesRes] = await Promise.all([
+    const [userRes, reposRes] = await Promise.all([
       authAPI.getCurrentUser(),
       repoAPI.getConnectedRepos(),
-      issueAPI.getAll(), // fetch all issues from backend
     ]);
 
     setUser(userRes.data);
@@ -28,19 +27,29 @@ export default function Dashboard() {
 
     const activeRepos = reposRes.data.filter((r: any) => r.is_active);
     let totalReviewsCount = 0;
+    let totalIssuesCount = 0;
 
     for (const repo of activeRepos) {
       try {
         const reviewRes = await reviewAPI.getReviewsByRepo(repo.id);
         const reviews = reviewRes.data || [];
+
+        // count total reviews
         totalReviewsCount += reviews.length;
+
+        // ✅ count issues if review objects contain `issues`
+        const repoIssueCount = reviews.reduce((acc: number, rev: any) => {
+          if (Array.isArray(rev.issues)) {
+            return acc + rev.issues.length;
+          }
+          return acc;
+        }, 0);
+
+        totalIssuesCount += repoIssueCount;
       } catch (err) {
         console.warn(`Failed to load reviews for ${repo.full_name}`);
       }
     }
-
-    // Count total issues from issues table
-    const totalIssuesCount = issuesRes.data?.length || 0;
 
     setTotalReviews(totalReviewsCount);
     setTotalIssues(totalIssuesCount);
