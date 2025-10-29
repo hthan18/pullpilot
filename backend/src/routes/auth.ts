@@ -6,45 +6,30 @@ import { authenticateToken, AuthRequest } from '../middleware/auth';
 
 const router = express.Router();
 
-// ✅ GitHub OAuth login - return URL to frontend
-router.get('/github', (req, res) => {
+// GitHub OAuth login - return URL to frontend
+router.get('/github', (_req, res) => {
   const clientId = process.env.GITHUB_CLIENT_ID;
-  const redirectUri = `${process.env.SERVER_URL}/api/auth/github/callback`;
+  const redirectUri = `https://pullpilot-production.up.railway.app/api/auth/github/callback`;
   const scope = 'read:user,user:email,repo';
-
-  console.log('🌍 ENV CHECK:', {
-    GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
-    GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
-    CLIENT_URL: process.env.CLIENT_URL,
-    SERVER_URL: process.env.SERVER_URL,
-  });
 
   if (!clientId) {
     console.error('❌ Missing GITHUB_CLIENT_ID');
     return res.status(500).json({ error: 'GitHub client ID not configured' });
   }
 
-  if (!process.env.SERVER_URL) {
-    console.error('❌ Missing SERVER_URL');
-    return res.status(500).json({ error: 'SERVER_URL not configured' });
-  }
-
   const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(
     redirectUri
   )}&scope=${scope}`;
 
-  console.log('✅ Generated GitHub Auth URL:', githubAuthUrl);
   res.json({ url: githubAuthUrl });
 });
 
-// ✅ GitHub OAuth callback
+// GitHub OAuth callback
 router.get('/github/callback', async (req, res) => {
   const { code } = req.query;
-
   if (!code) return res.status(400).json({ error: 'No code provided' });
 
   try {
-    // Exchange code for access token
     const tokenResponse = await axios.post(
       'https://github.com/login/oauth/access_token',
       {
@@ -58,14 +43,12 @@ router.get('/github/callback', async (req, res) => {
     const accessToken = tokenResponse.data.access_token;
     if (!accessToken) throw new Error('Failed to get GitHub access token');
 
-    // Get user info
     const userResponse = await axios.get('https://api.github.com/user', {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
 
     const githubUser = userResponse.data;
 
-    // Check or insert user in DB
     let userResult = await pool.query('SELECT * FROM users WHERE github_id = $1', [githubUser.id.toString()]);
     let userId;
 
@@ -85,13 +68,9 @@ router.get('/github/callback', async (req, res) => {
       );
     }
 
-    // Create JWT
     const jwtToken = jwt.sign({ userId }, process.env.JWT_SECRET as string, { expiresIn: '7d' });
 
-    // Redirect back to frontend
-    const redirectUrl = `${process.env.CLIENT_URL}/?token=${jwtToken}`;
-    console.log('✅ Redirecting to:', redirectUrl);
-    res.redirect(redirectUrl);
+    res.redirect(`${process.env.CLIENT_URL}/?token=${jwtToken}`);
   } catch (error: any) {
     console.error('GitHub OAuth error:', error.response?.data || error.message);
     res.status(500).json({ error: 'Authentication failed' });
