@@ -6,13 +6,21 @@ import { authenticateToken, AuthRequest } from '../middleware/auth';
 
 const router = express.Router();
 
-/**
- * Start GitHub OAuth login
- */
-router.get('/github', (_req, res) => {
-  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&scope=repo,user:email`;
+// GitHub OAuth login - redirect user to GitHub
+router.get('/github', (req, res) => {
+  const clientId = process.env.GITHUB_CLIENT_ID;
+  const scope = 'repo,user:email';
+  
+  if (!clientId) {
+    console.error('Missing GITHUB_CLIENT_ID in environment variables');
+    return res.status(500).json({ error: 'GitHub client ID not configured' });
+  }
+
+  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=${scope}`;
+  console.log('🔗 Sending GitHub Auth URL:', githubAuthUrl);
   res.json({ url: githubAuthUrl });
 });
+
 
 /**
  * GitHub OAuth callback
