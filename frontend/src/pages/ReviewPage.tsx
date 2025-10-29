@@ -14,24 +14,39 @@ export default function ReviewPage() {
 
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, 5000); // Poll every 5 seconds
+    const interval = setInterval(loadData, 5000);
     return () => clearInterval(interval);
   }, [repoId]);
 
   const loadData = async () => {
-    try {
-      const [userRes, reviewsRes] = await Promise.all([
-        authAPI.getCurrentUser(),
-        reviewAPI.getReviewsByRepo(Number(repoId)),
-      ]);
-      setUser(userRes.data);
-      setReviews(reviewsRes.data);
-    } catch (error) {
-      console.error('Error loading data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    const [userRes, reviewsRes] = await Promise.all([
+      authAPI.getCurrentUser(),
+      reviewAPI.getReviewsByRepo(Number(repoId)),
+    ]);
+
+    setUser(userRes.data);
+
+    const uniqueReviews = Object.values(
+      reviewsRes.data.reduce((acc: any, review: any) => {
+        const existing = acc[review.pr_number];
+        if (!existing || new Date(review.created_at) > new Date(existing.created_at)) {
+          acc[review.pr_number] = review;
+        }
+        return acc;
+      }, {})
+    );
+
+    // ✅ Sort newest first
+    uniqueReviews.sort((a: any, b: any) => new Date(b.created_at) - new Date(a.created_at));
+
+    setReviews(uniqueReviews);
+  } catch (error) {
+    console.error('Error loading data:', error);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleAnalyze = async () => {
     if (!prNumber) {
