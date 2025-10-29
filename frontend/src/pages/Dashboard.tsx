@@ -15,44 +15,52 @@ export default function Dashboard() {
   }, []);
 
   const loadData = async () => {
-    try {
-      const [userRes, reposRes] = await Promise.all([
-        authAPI.getCurrentUser(),
-        repoAPI.getConnectedRepos(),
-      ]);
+  try {
+    const [userRes, reposRes] = await Promise.all([
+      authAPI.getCurrentUser(),
+      repoAPI.getConnectedRepos(),
+    ]);
 
-      setUser(userRes.data);
-      setRepos(reposRes.data);
+    setUser(userRes.data);
+    setRepos(reposRes.data);
 
-      // Fetch total reviews + issues
-      const activeRepos = reposRes.data.filter((r: any) => r.is_active);
-      let totalReviewsCount = 0;
-      let totalIssuesCount = 0;
+    const activeRepos = reposRes.data.filter((r: any) => r.is_active);
+    let totalReviewsCount = 0;
+    let totalIssuesCount = 0;
 
-      for (const repo of activeRepos) {
-        try {
-          const reviewRes = await reviewAPI.getReviewsByRepo(repo.id);
-          const reviews = reviewRes.data || [];
-          totalReviewsCount += reviews.length;
-          totalIssuesCount += reviews.reduce(
-            (acc: number, rev: any) => acc + (rev.issues?.length || 0),
-            0
-          );
-        } catch (err) {
-          console.warn(`Failed to load reviews for ${repo.full_name}`);
-        }
+    for (const repo of activeRepos) {
+      try {
+        const reviewRes = await reviewAPI.getReviewsByRepo(repo.id);
+        const reviews = reviewRes.data || [];
+
+        // count total reviews
+        totalReviewsCount += reviews.length;
+
+        // ✅ count issues if review objects contain `issues`
+        const repoIssueCount = reviews.reduce((acc: number, rev: any) => {
+          if (Array.isArray(rev.issues)) {
+            return acc + rev.issues.length;
+          }
+          return acc;
+        }, 0);
+
+        totalIssuesCount += repoIssueCount;
+      } catch (err) {
+        console.warn(`Failed to load reviews for ${repo.full_name}`);
       }
-
-      setTotalReviews(totalReviewsCount);
-      setTotalIssues(totalIssuesCount);
-    } catch (error) {
-      console.error('Error loading data:', error);
-      localStorage.removeItem('token');
-      navigate('/');
-    } finally {
-      setLoading(false);
     }
-  };
+
+    setTotalReviews(totalReviewsCount);
+    setTotalIssues(totalIssuesCount);
+  } catch (error) {
+    console.error('Error loading data:', error);
+    localStorage.removeItem('token');
+    navigate('/');
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const handleLogout = () => {
     localStorage.removeItem('token');
