@@ -1,47 +1,41 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../services/api';
 
 export default function Login() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
 
-  // ✅ Handle redirect back from GitHub (with ?token=)
+  // Run once: if a token is in URL, store it and go to dashboard
   useEffect(() => {
-    const token = searchParams.get('token');
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
     if (token) {
       localStorage.setItem('token', token);
+      window.history.replaceState({}, '', '/'); // remove ?token from URL
       navigate('/dashboard');
     }
-  }, [searchParams, navigate]);
-
-  // ✅ Auto-redirect if already logged in (token still valid)
-  useEffect(() => {
-    const checkUser = async () => {
-      try {
-        const res = await authAPI.getCurrentUser();
-        if (res.data) navigate('/dashboard');
-      } catch {
-        // Not logged in — do nothing
-      }
-    };
-    checkUser();
   }, [navigate]);
 
-  // ✅ Handle GitHub login flow
+  // Auto-redirect if token already stored
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) navigate('/dashboard');
+  }, [navigate]);
+
+  // Trigger GitHub login
   const handleGitHubLogin = async () => {
     setLoading(true);
     try {
       const { data } = await authAPI.getGitHubAuthUrl();
       if (data?.url) {
-        window.location.href = data.url; // Redirect to GitHub
+        window.location.href = data.url; // go to GitHub OAuth
       } else {
-        console.error('No GitHub URL returned from backend.');
+        console.error('No GitHub auth URL returned.');
         setLoading(false);
       }
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('GitHub login error:', error);
       setLoading(false);
     }
   };
@@ -67,7 +61,6 @@ export default function Login() {
             border: '1px solid #374151',
           }}
         >
-          {/* Logo/Title */}
           <div style={{ textAlign: 'center', marginBottom: '32px' }}>
             <div
               style={{
@@ -108,7 +101,6 @@ export default function Login() {
             <p style={{ color: '#9ca3af' }}>AI-Powered Code Review Platform</p>
           </div>
 
-          {/* Features */}
           <div style={{ marginBottom: '32px' }}>
             {[
               { title: 'Automated Code Reviews', desc: 'AI analyzes your PRs instantly' },
@@ -147,7 +139,6 @@ export default function Login() {
             ))}
           </div>
 
-          {/* Login Button */}
           <button
             onClick={handleGitHubLogin}
             disabled={loading}
@@ -167,8 +158,6 @@ export default function Login() {
               transition: 'background 0.2s',
               opacity: loading ? 0.5 : 1,
             }}
-            onMouseEnter={(e) => !loading && (e.currentTarget.style.background = '#000')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = '#111827')}
           >
             <svg style={{ width: '20px', height: '20px' }} fill="currentColor" viewBox="0 0 24 24">
               <path
