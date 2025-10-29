@@ -171,8 +171,8 @@ export default function Dashboard() {
                         <p style={{ color: '#9ca3af', fontSize: '14px', margin: 0 }}>Connected {new Date(repo.created_at).toLocaleDateString()}</p>
                       </div>
                     </div>
-                    <Link to={`/repositories/${repo.id}`} style={{ color: '#3b82f6', fontSize: '14px', fontWeight: '500', textDecoration: 'none' }}>
-                      View Reviews →
+                    <Link to={`/repositories/${repo.id}/reviews`} style={{ color: '#3b82f6', fontSize: '14px', fontWeight: '500', textDecoration: 'none' }}>
+                    View Reviews →
                     </Link>
                   </div>
                 ))}
