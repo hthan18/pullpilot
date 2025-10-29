@@ -89,11 +89,7 @@ export default function Dashboard() {
                 <img
                   src={user?.avatar_url}
                   alt={user?.username}
-                  style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '50%',
-                  }}
+                  style={{ width: '32px', height: '32px', borderRadius: '50%' }}
                 />
                 <span style={{ color: '#d1d5db', fontSize: '14px' }}>
                   {user?.username}
@@ -343,7 +339,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* ✅ Fixed Connected Repositories Section */}
+        {/* Connected Repositories */}
         <div
           style={{
             background: '#1f2937',
@@ -428,13 +424,7 @@ export default function Dashboard() {
                 </Link>
               </div>
             ) : (
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '16px',
-                }}
-              >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {repos
                   .filter((r) => r.is_active)
                   .map((repo) => (
@@ -449,13 +439,7 @@ export default function Dashboard() {
                         borderRadius: '8px',
                       }}
                     >
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '16px',
-                        }}
-                      >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                         <div
                           style={{
                             background: '#374151',
@@ -485,13 +469,7 @@ export default function Dashboard() {
                           </svg>
                         </div>
                         <div>
-                          <p
-                            style={{
-                              color: 'white',
-                              fontWeight: '500',
-                              margin: 0,
-                            }}
-                          >
+                          <p style={{ color: 'white', fontWeight: '500', margin: 0 }}>
                             {repo.full_name}
                           </p>
                           <p
@@ -501,13 +479,10 @@ export default function Dashboard() {
                               margin: 0,
                             }}
                           >
-                            Connected{' '}
-                            {new Date(repo.created_at).toLocaleDateString()}
+                            Connected {new Date(repo.created_at).toLocaleDateString()}
                           </p>
                         </div>
                       </div>
-
-                      {/* ✅ FIXED VIEW REVIEWS LINK */}
                       <Link
                         to={`/repositories/${repo.id}/reviews`}
                         style={{
