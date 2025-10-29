@@ -31,9 +31,10 @@ api.interceptors.response.use(
 // --- AUTH ENDPOINTS ---
 export const authAPI = {
   getGitHubAuthUrl: async () => {
-    const res = await api.get('/auth/github');
-    return res.data.url; // return just the URL string
-  },
+  const res = await api.get('/auth/github');
+  return res.data; // ✅ returns { url: "..." }
+},
+
   getCurrentUser: () => api.get('/auth/me'),
   logout: () => api.post('/auth/logout'),
 };
