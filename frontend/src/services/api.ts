@@ -53,4 +53,9 @@ export const reviewAPI = {
   getReview: (id: number) => api.get(`/reviews/${id}`),
 };
 
+export const issueAPI = {
+  getAll: () => api.get('/issues'),
+  getByRepo: (repoId: number) => api.get(`/issues/repository/${repoId}`),
+};
+
 export default api;
