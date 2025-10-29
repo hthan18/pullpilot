@@ -12,16 +12,28 @@ router.get('/github', (req, res) => {
   const redirectUri = `${process.env.SERVER_URL}/api/auth/github/callback`;
   const scope = 'read:user,user:email,repo';
 
+  console.log('🌍 ENV CHECK:', {
+    GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
+    GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
+    CLIENT_URL: process.env.CLIENT_URL,
+    SERVER_URL: process.env.SERVER_URL,
+  });
+
   if (!clientId) {
-    console.error('❌ Missing GITHUB_CLIENT_ID in environment variables');
+    console.error('❌ Missing GITHUB_CLIENT_ID');
     return res.status(500).json({ error: 'GitHub client ID not configured' });
+  }
+
+  if (!process.env.SERVER_URL) {
+    console.error('❌ Missing SERVER_URL');
+    return res.status(500).json({ error: 'SERVER_URL not configured' });
   }
 
   const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(
     redirectUri
   )}&scope=${scope}`;
 
-  console.log('🔗 Generated GitHub Auth URL:', githubAuthUrl);
+  console.log('✅ Generated GitHub Auth URL:', githubAuthUrl);
   res.json({ url: githubAuthUrl });
 });
 
