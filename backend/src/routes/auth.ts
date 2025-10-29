@@ -12,6 +12,8 @@ router.get('/github', (req, res) => {
   const redirectUri = `${process.env.SERVER_URL}/api/auth/github/callback`;
   const scope = 'read:user,user:email,repo';
 
+  console.log("🚀 redirectUri sent to GitHub:", redirectUri);
+
   console.log('🌍 ENV CHECK:', {
     GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
     GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
