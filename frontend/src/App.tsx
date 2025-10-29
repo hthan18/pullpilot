@@ -1,47 +1,86 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect, useState, type JSX } from 'react';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Repositories from './pages/Repositories';
 import ReviewPage from './pages/ReviewPage';
+import { authAPI } from './services/api';
 
-// Simple protected route component
-function PrivateRoute({ children }: { children: React.ReactNode }) {
-  const token = localStorage.getItem('token');
-  return token ? <>{children}</> : <Navigate to="/" />;
+// Protected Route wrapper
+function ProtectedRoute({ children }: { children: JSX.Element }) {
+  const [loading, setLoading] = useState(true);
+  const [authenticated, setAuthenticated] = useState(false);
+
+  useEffect(() => {
+    const verifyUser = async () => {
+      try {
+        await authAPI.getCurrentUser();
+        setAuthenticated(true);
+      } catch {
+        setAuthenticated(false);
+      } finally {
+        setLoading(false);
+      }
+    };
+    verifyUser();
+  }, []);
+
+  if (loading) {
+    return (
+      <div
+        style={{
+          height: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'white',
+          background: '#0f172a',
+        }}
+      >
+        Checking authentication...
+      </div>
+    );
+  }
+
+  return authenticated ? children : <Navigate to="/" replace />;
 }
 
-function App() {
+export default function App() {
   return (
-    <BrowserRouter>
+    <Router>
       <Routes>
+        {/* Public route */}
         <Route path="/" element={<Login />} />
+
+        {/* Protected routes */}
         <Route
           path="/dashboard"
           element={
-            <PrivateRoute>
+            <ProtectedRoute>
               <Dashboard />
-            </PrivateRoute>
+            </ProtectedRoute>
           }
         />
         <Route
           path="/repositories"
           element={
-            <PrivateRoute>
+            <ProtectedRoute>
               <Repositories />
-            </PrivateRoute>
+            </ProtectedRoute>
           }
         />
         <Route
           path="/repositories/:repoId/reviews"
           element={
-            <PrivateRoute>
+            <ProtectedRoute>
               <ReviewPage />
-            </PrivateRoute>
+            </ProtectedRoute>
           }
         />
+
+        {/* Catch-all redirect */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </BrowserRouter>
+    </Router>
   );
 }
-
-export default App;
