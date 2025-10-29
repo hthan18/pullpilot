@@ -37,8 +37,11 @@ export default function ReviewPage() {
       }, {})
     );
 
-    // ✅ Sort newest first
-    uniqueReviews.sort((a: any, b: any) => new Date(b.created_at) - new Date(a.created_at));
+
+    uniqueReviews.sort(
+      (a: any, b: any) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
 
     setReviews(uniqueReviews);
   } catch (error) {
