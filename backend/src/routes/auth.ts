@@ -6,49 +6,60 @@ import { authenticateToken, AuthRequest } from '../middleware/auth';
 
 const router = express.Router();
 
-// GitHub OAuth login - redirect user to GitHub
-router.get('/github', (req, res) => {
+/**
+ * Start GitHub OAuth login
+ */
+router.get('/github', (_req, res) => {
   const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&scope=repo,user:email`;
   res.json({ url: githubAuthUrl });
 });
 
-// GitHub OAuth callback
+/**
+ * GitHub OAuth callback
+ */
 router.get('/github/callback', async (req, res) => {
   const { code } = req.query;
-
   if (!code) return res.status(400).json({ error: 'No code provided' });
 
   try {
-    // Exchange code for access token
+    // Exchange code for GitHub access token
     const tokenResponse = await axios.post(
       'https://github.com/login/oauth/access_token',
       {
         client_id: process.env.GITHUB_CLIENT_ID,
         client_secret: process.env.GITHUB_CLIENT_SECRET,
-        code
+        code,
       },
       { headers: { Accept: 'application/json' } }
     );
 
     const accessToken = tokenResponse.data.access_token;
 
-    // Get user info
+    // Get user info from GitHub
     const userResponse = await axios.get('https://api.github.com/user', {
-      headers: { Authorization: `Bearer ${accessToken}` }
+      headers: { Authorization: `Bearer ${accessToken}` },
     });
 
     const githubUser = userResponse.data;
 
-    // Check or insert user
-    let userResult = await pool.query('SELECT * FROM users WHERE github_id = $1', [githubUser.id.toString()]);
-    let userId;
+    // Check if user exists
+    let userResult = await pool.query('SELECT * FROM users WHERE github_id = $1', [
+      githubUser.id.toString(),
+    ]);
+    let userId: number;
 
     if (userResult.rows.length === 0) {
       const insertResult = await pool.query(
         `INSERT INTO users (github_id, username, email, avatar_url, access_token)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING id`,
-        [githubUser.id.toString(), githubUser.login, githubUser.email, githubUser.avatar_url, accessToken]
+        [
+          githubUser.id.toString(),
+          githubUser.login,
+          githubUser.email,
+          githubUser.avatar_url,
+          accessToken,
+        ]
       );
       userId = insertResult.rows[0].id;
     } else {
@@ -59,18 +70,22 @@ router.get('/github/callback', async (req, res) => {
       );
     }
 
-    // Generate JWT token
-    const jwtToken = jwt.sign({ userId }, process.env.JWT_SECRET as string, { expiresIn: '7d' });
+    // Generate JWT
+    const jwtToken = jwt.sign({ userId }, process.env.JWT_SECRET as string, {
+      expiresIn: '7d',
+    });
 
-    // Redirect back to frontend with token
-    res.redirect(`${process.env.CLIENT_URL}?token=${jwtToken}`);
+    // Redirect to frontend /auth/callback with token param
+    res.redirect(`${process.env.CLIENT_URL}/auth/callback?token=${jwtToken}`);
   } catch (error: any) {
     console.error('GitHub OAuth error:', error.response?.data || error.message);
     res.status(500).json({ error: 'Authentication failed' });
   }
 });
 
-// Get current user info
+/**
+ * STEP 3: Get current authenticated user
+ */
 router.get('/me', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const result = await pool.query(
@@ -78,8 +93,9 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res) => {
       [req.userId]
     );
 
-    if (result.rows.length === 0)
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
+    }
 
     res.json(result.rows[0]);
   } catch (error) {
@@ -88,8 +104,10 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res) => {
   }
 });
 
-// Logout
-router.post('/logout', (req, res) => {
+/**
+ * STEP 4: Logout (frontend handles token removal)
+ */
+router.post('/logout', (_req, res) => {
   res.json({ message: 'Logged out successfully' });
 });
 
