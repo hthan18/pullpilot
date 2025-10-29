@@ -27,16 +27,22 @@ export default function ReviewPage() {
 
     setUser(userRes.data);
 
-    const uniqueReviews = Object.values(
-      reviewsRes.data.reduce((acc: any, review: any) => {
-        const existing = acc[review.pr_number];
-        if (!existing || new Date(review.created_at) > new Date(existing.created_at)) {
-          acc[review.pr_number] = review;
-        }
-        return acc;
-      }, {})
-    );
+    const rawReviews = reviewsRes.data;
+    const uniqueMap: Record<string, any> = {};
 
+    for (const review of rawReviews) {
+      const key = `${review.pr_number}-${review.pr_title?.trim()}`;
+      const existing = uniqueMap[key];
+
+      if (
+        !existing ||
+        new Date(review.created_at).getTime() > new Date(existing.created_at).getTime()
+      ) {
+        uniqueMap[key] = review;
+      }
+    }
+
+    const uniqueReviews = Object.values(uniqueMap);
 
     uniqueReviews.sort(
       (a: any, b: any) =>
@@ -45,11 +51,12 @@ export default function ReviewPage() {
 
     setReviews(uniqueReviews);
   } catch (error) {
-    console.error('Error loading data:', error);
+    console.error("Error loading data:", error);
   } finally {
     setLoading(false);
   }
 };
+
 
   const handleAnalyze = async () => {
     if (!prNumber) {
