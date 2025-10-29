@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { authAPI, repoAPI, reviewAPI, issueAPI } from '../services/api';
+import { authAPI, repoAPI, reviewAPI} from '../services/api';
 
 
 export default function Dashboard() {
