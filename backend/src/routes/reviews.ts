@@ -2,6 +2,7 @@ import express from 'express';
 import axios from 'axios';
 import pool from '../config/db';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
+import { decryptToken } from '../security/tokenEncryption';
 
 const router = express.Router();
 
@@ -57,18 +58,19 @@ router.post('/', async (req: AuthRequest, res) => {
     }
 
     const repo = repoResult.rows[0];
+    const accessToken = decryptToken(repo.access_token);
 
     // Fetch PR details from GitHub
     const prResponse = await axios.get(
       `https://api.github.com/repos/${repo.full_name}/pulls/${prNumber}`,
-      { headers: { Authorization: `Bearer ${repo.access_token}` } }
+      { headers: { Authorization: `Bearer ${accessToken}` } }
     );
 
     const pr = prResponse.data;
 
     // Fetch PR diff
     const diffResponse = await axios.get(pr.diff_url, {
-      headers: { Authorization: `Bearer ${repo.access_token}` }
+      headers: { Authorization: `Bearer ${accessToken}` }
     });
 
     const diff = diffResponse.data;

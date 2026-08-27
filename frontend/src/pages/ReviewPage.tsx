@@ -98,9 +98,12 @@ export default function ReviewPage() {
   }
 };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    navigate('/');
+  const handleLogout = async () => {
+    try {
+      await authAPI.logout();
+    } finally {
+      navigate('/');
+    }
   };
 
   const renderAnalysis = (review: any) => {

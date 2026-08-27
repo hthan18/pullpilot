@@ -47,6 +47,14 @@ http://localhost:5000/api/auth/github/callback
 
 Never commit `.env`, `.env.local`, OAuth secrets, database passwords, access tokens, or JWT secrets.
 
+For production, generate a separate GitHub-token encryption key and set `TOKEN_ENCRYPTION_KEY`:
+
+```powershell
+node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"
+```
+
+Development derives a local encryption key from `JWT_SECRET` when this optional value is blank. Production startup rejects a missing encryption key.
+
 ## 3. Initialize PostgreSQL
 
 From `backend/`:
@@ -81,6 +89,7 @@ Open `http://localhost:5173`. The backend health check is available at `http://l
 ```powershell
 cd backend
 npm run build
+npm test
 
 cd ..\frontend
 npm run build
@@ -95,3 +104,12 @@ npm run lint
 - Encrypt or replace stored GitHub access tokens, preferably with a GitHub App installation flow.
 - Add automated tests and CI.
 - Reconnect and verify the Vercel, backend, database, and GitHub OAuth deployments.
+
+## Authentication notes
+
+- Sessions are stored in an HTTP-only cookie instead of browser local storage or redirect URLs.
+- GitHub OAuth requests use a short-lived state cookie to reject forged callbacks.
+- GitHub access tokens are encrypted with AES-256-GCM before database storage.
+- The OAuth scope currently requests only user profile and email access, so repository discovery is limited to repositories visible without the broad `repo` scope.
+- Users created before token encryption was introduced must sign in again once. A successful login replaces the legacy plaintext token with an encrypted value.
+- Production deployments should expose the frontend and API through the same site or a frontend proxy where possible; cross-site session cookies may be restricted by browser privacy controls.

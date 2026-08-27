@@ -2,6 +2,7 @@ import express from 'express';
 import axios from 'axios';
 import pool from '../config/db';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
+import { decryptToken } from '../security/tokenEncryption';
 
 const router = express.Router();
 
@@ -21,7 +22,7 @@ router.get('/github', async (req: AuthRequest, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const accessToken = userResult.rows[0].access_token;
+    const accessToken = decryptToken(userResult.rows[0].access_token);
 
     // Fetch repos from GitHub
     const response = await axios.get('https://api.github.com/user/repos', {
