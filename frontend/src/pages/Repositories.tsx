@@ -62,9 +62,12 @@ export default function Repositories() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    navigate('/');
+  const handleLogout = async () => {
+    try {
+      await authAPI.logout();
+    } finally {
+      navigate('/');
+    }
   };
 
   const isConnected = (githubRepoId: string) => {

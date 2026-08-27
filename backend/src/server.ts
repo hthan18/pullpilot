@@ -1,27 +1,25 @@
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
+import cookieParser from 'cookie-parser';
 import authRoutes from './routes/auth';
 import repoRoutes from './routes/repositories';
 import reviewRoutes from './routes/reviews';
 import issueRoutes from './routes/issues';
-
-dotenv.config();
+import { env } from './config/env';
+import { requireTrustedOrigin } from './middleware/trustedOrigin';
 
 const app = express();
-const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(
   cors({
-    origin: [
-      process.env.CLIENT_URL || 'http://localhost:5173',
-      'https://pullpilot-eight.vercel.app',
-    ],
+    origin: env.clientUrl,
     credentials: true,
   })
 );
 app.use(express.json());
+app.use(cookieParser());
+app.use(requireTrustedOrigin);
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -39,11 +37,11 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   console.error(err.stack);
   res.status(500).json({ 
     error: 'Something went wrong!',
-    message: process.env.NODE_ENV === 'development' ? err.message : undefined
+    message: env.nodeEnvironment === 'development' ? err.message : undefined
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+app.listen(env.port, () => {
+  console.log(`Server running on port ${env.port}`);
+  console.log(`Environment: ${env.nodeEnvironment}`);
 });

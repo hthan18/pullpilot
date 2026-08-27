@@ -46,7 +46,6 @@ export default function Dashboard() {
     setTotalIssues(totalIssuesCount);
   } catch (error) {
     console.error('Error loading data:', error);
-    localStorage.removeItem('token');
     navigate('/');
   } finally {
     setLoading(false);
@@ -55,9 +54,12 @@ export default function Dashboard() {
 
 
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    navigate('/');
+  const handleLogout = async () => {
+    try {
+      await authAPI.logout();
+    } finally {
+      navigate('/');
+    }
   };
 
   if (loading) {

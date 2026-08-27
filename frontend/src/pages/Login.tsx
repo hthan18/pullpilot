@@ -5,43 +5,25 @@ import { authAPI } from '../services/api';
 export default function Login() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
 
-  // Run once: if a token is in URL, store it and go to dashboard
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
-    if (token) {
-      localStorage.setItem('token', token);
-      window.history.replaceState({}, '', '/dashboard'); // remove ?token from URL
-      navigate('/dashboard');
-    }
-  }, [navigate]);
+    let active = true;
+    authAPI.getCurrentUser()
+      .then(() => active && navigate('/dashboard'))
+      .catch(() => undefined)
+      .finally(() => active && setCheckingSession(false));
 
-  // Auto-redirect if token already stored
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) navigate('/dashboard');
+    return () => {
+      active = false;
+    };
   }, [navigate]);
 
   // Trigger GitHub login
   const handleGitHubLogin = async () => {
-  setLoading(true);
-  try {
-    const { url } = await authAPI.getGitHubAuthUrl();
-if (url) {
-  window.location.href = url;
-} else {
-  console.error('No GitHub URL returned from backend');
-  alert('Login failed: GitHub URL not provided');
-  setLoading(false);
-}
-
-  } catch (error) {
-    console.error('Login error:', error);
-    alert('Login error. Check console.');
-    setLoading(false);
-  }
-};
+    setLoading(true);
+    window.location.href = authAPI.getGitHubLoginUrl();
+  };
 
   return (
     <div
@@ -144,7 +126,7 @@ if (url) {
 
           <button
             onClick={handleGitHubLogin}
-            disabled={loading}
+            disabled={loading || checkingSession}
             style={{
               width: '100%',
               background: '#111827',
@@ -153,13 +135,13 @@ if (url) {
               padding: '12px 16px',
               borderRadius: '8px',
               border: '1px solid #374151',
-              cursor: loading ? 'not-allowed' : 'pointer',
+              cursor: loading || checkingSession ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '8px',
               transition: 'background 0.2s',
-              opacity: loading ? 0.5 : 1,
+              opacity: loading || checkingSession ? 0.5 : 1,
             }}
           >
             <svg style={{ width: '20px', height: '20px' }} fill="currentColor" viewBox="0 0 24 24">
@@ -169,7 +151,7 @@ if (url) {
                 clipRule="evenodd"
               />
             </svg>
-            <span>{loading ? 'Connecting...' : 'Continue with GitHub'}</span>
+            <span>{loading ? 'Connecting...' : checkingSession ? 'Checking session...' : 'Continue with GitHub'}</span>
           </button>
 
           <p

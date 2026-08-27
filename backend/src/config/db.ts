@@ -1,11 +1,9 @@
 import { Pool } from 'pg';
-import dotenv from 'dotenv';
-
-dotenv.config();
+import { env } from './env';
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/devflow',
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  connectionString: env.databaseUrl,
+  ssl: env.isProduction ? { rejectUnauthorized: false } : false
 });
 
 pool.on('connect', () => {
