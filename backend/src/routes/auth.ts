@@ -14,13 +14,6 @@ router.get('/github', (req, res) => {
 
   console.log("🚀 redirectUri sent to GitHub:", redirectUri);
 
-  console.log('🌍 ENV CHECK:', {
-    GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
-    GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
-    CLIENT_URL: process.env.CLIENT_URL,
-    SERVER_URL: process.env.SERVER_URL,
-  });
-
   if (!clientId) {
     console.error('❌ Missing GITHUB_CLIENT_ID');
     return res.status(500).json({ error: 'GitHub client ID not configured' });
