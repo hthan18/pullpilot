@@ -48,6 +48,8 @@ export const env = {
   databaseUrl: requireValue('DATABASE_URL'),
   githubClientId: requireValue('GITHUB_CLIENT_ID'),
   githubClientSecret: requireValue('GITHUB_CLIENT_SECRET'),
+  openaiApiKey: process.env.OPENAI_API_KEY?.trim(),
+  openaiModel: process.env.OPENAI_MODEL?.trim() || 'gpt-5.4-mini',
   jwtSecret,
   tokenEncryptionKey,
 };
