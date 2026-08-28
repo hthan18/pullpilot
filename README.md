@@ -116,6 +116,44 @@ The processor currently runs asynchronously inside the API process. A production
 - Add automated tests and CI.
 - Reconnect and verify the Vercel, backend, database, and GitHub OAuth deployments.
 
+## Production deployment
+
+### Backend and database (Railway)
+
+Create a Railway project with a PostgreSQL service and a service sourced from this GitHub repository. Set the service root directory to `backend`; Railway will read `backend/railway.json`, build TypeScript, run migrations, start the API, and check `/health`.
+
+Set these backend variables without committing their values:
+
+```text
+NODE_ENV=production
+PORT=5000
+CLIENT_URL=https://your-vercel-domain.vercel.app
+SERVER_URL=https://your-railway-api-domain.up.railway.app
+DATABASE_URL=<Railway PostgreSQL reference>
+GITHUB_CLIENT_ID=<production OAuth app client ID>
+GITHUB_CLIENT_SECRET=<production OAuth app secret>
+JWT_SECRET=<at least 32 random characters>
+TOKEN_ENCRYPTION_KEY=<32 random bytes encoded as base64url>
+OPENAI_API_KEY=<OpenAI API key>
+OPENAI_MODEL=gpt-5.4-mini
+```
+
+Update the GitHub OAuth App callback URL to:
+
+```text
+https://your-railway-api-domain.up.railway.app/api/auth/github/callback
+```
+
+### Frontend (Vercel)
+
+Keep the Vercel project root directory set to `frontend`. Add this production variable and redeploy:
+
+```text
+VITE_API_URL=https://your-railway-api-domain.up.railway.app
+```
+
+Pushes and pull requests run `.github/workflows/ci.yml`. Vercel Git integration can create previews for branches and production deployments from `main`.
+
 ## Authentication notes
 
 - Sessions are stored in an HTTP-only cookie instead of browser local storage or redirect URLs.
