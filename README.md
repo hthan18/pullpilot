@@ -1,14 +1,27 @@
 # PullPilot
 
-PullPilot is a full-stack proof of concept for reviewing GitHub pull requests. Users authenticate with GitHub, connect repositories, select a pull request, and view categorized review findings.
+PullPilot is an evidence-first AI review workspace for GitHub pull requests. It combines repository-specific review policies, diff-grounded finding validation, developer feedback, quality analytics, and explicitly approved GitHub publishing.
 
-> Current status: GitHub authentication, repository access, pull-request retrieval, persistence, and evidence-based OpenAI review are implemented.
+> Current status: the complete local product workflow is implemented, including authentication, repository policies, structured AI review, deterministic evidence validation, feedback analytics, and GitHub PR publishing.
+
+## Why PullPilot is different
+
+Most AI review demos display everything a model generates. PullPilot treats model output as an untrusted candidate set:
+
+- Findings must reference a file that was actually analyzed.
+- Line-specific findings must point to a changed line in the supplied patch.
+- Findings below the repository's confidence or severity policy are removed.
+- Duplicate findings are removed before developers see them.
+- Accepted and dismissed findings are recorded so review quality is measurable.
+- GitHub comments are published only after an explicit user action.
+
+This makes the project an exploration of **trustworthy and measurable AI review**, rather than another generic pull-request summarizer.
 
 ## Architecture
 
 - `frontend/`: React, TypeScript, Vite, React Router, and Axios
 - `backend/`: Node.js, Express, TypeScript, JWT authentication, and GitHub OAuth
-- PostgreSQL: users, connected repositories, and review history
+- PostgreSQL: users, connected repositories, review policies, history, validation metadata, and finding feedback
 - Original hosting: Vercel frontend with a Railway API and PostgreSQL database
 
 ## Prerequisites
@@ -66,7 +79,7 @@ npm run db:check
 npm run db:migrate
 ```
 
-The migrations are idempotent and create the application tables plus review model, token-usage, file-count, timing, and failure metadata.
+The migrations are idempotent and create the application tables plus review model, token usage, validation, policy, publishing, feedback, timing, and failure metadata.
 
 ## 4. Run locally
 
@@ -104,7 +117,11 @@ npm run lint
 - Deleted, binary, generated, built, minified, and dependency-lock files are skipped.
 - Individual patches and total prompt size are capped before being sent to OpenAI.
 - The model must return a strict JSON schema with evidence, severity, category, file, optional line, remediation, and confidence.
+- Candidate findings then pass deterministic file, changed-line, confidence, severity, and duplicate validation.
+- Each repository can provide up to 4,000 characters of review instructions and choose its quality thresholds.
 - Model name, token usage, reviewed/skipped file counts, and failures are saved with each review.
+- Developers can mark findings useful or dismiss them, and the dashboard reports the resulting acceptance rate.
+- Completed reviews can be published as a structured GitHub pull-request comment with one explicit click.
 
 The processor currently runs asynchronously inside the API process. A production deployment should move it to a durable queue so a restart cannot strand a pending review.
 
@@ -116,13 +133,16 @@ The processor currently runs asynchronously inside the API process. A production
 - JSON request bodies are capped at 100 KB and Express technology headers are disabled.
 - The current in-memory limiter is appropriate for one API instance. Use a shared rate-limit store before scaling the backend horizontally.
 
-## Known revival work
+## Recruiter demo flow
 
-- Repair existing frontend lint errors and add shared TypeScript models.
-- Harden GitHub OAuth and stop returning session tokens through URLs.
-- Encrypt or replace stored GitHub access tokens, preferably with a GitHub App installation flow.
-- Add automated tests and CI.
-- Reconnect and verify the Vercel, backend, database, and GitHub OAuth deployments.
+1. Connect a public GitHub repository containing an open pull request.
+2. Open its review workspace and configure repository-specific rules.
+3. Run the PR analysis and show the validation count above the findings.
+4. Expand a finding to show its evidence and suggested fix.
+5. Mark one finding useful and dismiss another to update quality analytics.
+6. Publish the completed report to the pull request and open the resulting GitHub comment.
+
+For a repeatable demo, use a small repository with intentionally seeded correctness, security, and reliability problems plus at least one harmless change that should not generate a finding.
 
 ## Production deployment
 
@@ -167,6 +187,6 @@ Pushes and pull requests run `.github/workflows/ci.yml`. Vercel Git integration 
 - Sessions are stored in an HTTP-only cookie instead of browser local storage or redirect URLs.
 - GitHub OAuth requests use a short-lived state cookie to reject forged callbacks.
 - GitHub access tokens are encrypted with AES-256-GCM before database storage.
-- The OAuth scope currently requests only user profile and email access, so repository discovery is limited to repositories visible without the broad `repo` scope.
+- The OAuth scope requests profile, email, and `public_repo` access. This supports public-repository discovery and user-initiated PR comments without requesting the broad private-repository `repo` scope.
 - Users created before token encryption was introduced must sign in again once. A successful login replaces the legacy plaintext token with an encrypted value.
 - Production deployments should expose the frontend and API through the same site or a frontend proxy where possible; cross-site session cookies may be restricted by browser privacy controls.

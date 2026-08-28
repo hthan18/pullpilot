@@ -41,4 +41,5 @@ export interface PreparedDiff {
   prompt: string;
   analyzedFiles: string[];
   skippedFiles: Array<{ file: string; reason: string }>;
+  changedLines: Record<string, number[]>;
 }

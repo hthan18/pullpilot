@@ -10,7 +10,7 @@ export interface GeneratedReview {
   outputTokens: number;
 }
 
-export async function generateReview(prTitle: string, diff: string): Promise<GeneratedReview> {
+export async function generateReview(prTitle: string, diff: string, repositoryInstructions = ''): Promise<GeneratedReview> {
   if (!env.openaiApiKey) throw new Error('OPENAI_API_KEY is not configured');
   if (!diff.trim()) throw new Error('No reviewable text patches were found in this pull request');
 
@@ -25,6 +25,7 @@ export async function generateReview(prTitle: string, diff: string): Promise<Gen
       'The evidence must quote or precisely identify the relevant changed code.',
       'Use the new-file line number when it is unambiguous; otherwise use null.',
       'Return no more than 20 findings, ordered by severity.',
+      repositoryInstructions ? `Follow these repository-specific review rules: ${repositoryInstructions}` : '',
     ].join(' '),
     input: `Pull request title: ${prTitle}\n\nChanged files:\n${diff}`,
     text: {
