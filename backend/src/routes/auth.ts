@@ -14,10 +14,11 @@ import {
 } from '../config/cookies';
 import { env } from '../config/env';
 import { encryptToken } from '../security/tokenEncryption';
+import { oauthRateLimit } from '../middleware/rateLimits';
 
 const router = express.Router();
 
-router.get('/github', (req, res) => {
+router.get('/github', oauthRateLimit, (req, res) => {
   const state = randomBytes(32).toString('base64url');
   const redirectUri = `${env.serverUrl}/api/auth/github/callback`;
   const githubAuthUrl = new URL('https://github.com/login/oauth/authorize');
@@ -31,7 +32,7 @@ router.get('/github', (req, res) => {
   res.redirect(githubAuthUrl.toString());
 });
 
-router.get('/github/callback', async (req, res) => {
+router.get('/github/callback', oauthRateLimit, async (req, res) => {
   const code = typeof req.query.code === 'string' ? req.query.code : undefined;
   const returnedState = typeof req.query.state === 'string' ? req.query.state : undefined;
   const expectedState = req.cookies?.[OAUTH_STATE_COOKIE];

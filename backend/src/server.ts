@@ -7,8 +7,11 @@ import reviewRoutes from './routes/reviews';
 import issueRoutes from './routes/issues';
 import { env } from './config/env';
 import { requireTrustedOrigin } from './middleware/trustedOrigin';
+import { apiRateLimit } from './middleware/rateLimits';
 
-const app = express();
+export const app = express();
+app.set('trust proxy', env.isProduction ? 1 : false);
+app.disable('x-powered-by');
 
 // Middleware
 app.use(
@@ -17,9 +20,10 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json());
+app.use(express.json({ limit: '100kb' }));
 app.use(cookieParser());
 app.use(requireTrustedOrigin);
+app.use('/api', apiRateLimit);
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -33,15 +37,18 @@ app.get('/health', (req, res) => {
 });
 
 // Error handling middleware
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: Error & { status?: number }, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error(err.stack);
-  res.status(500).json({ 
-    error: 'Something went wrong!',
+  const status = err.status === 413 ? 413 : 500;
+  res.status(status).json({
+    error: status === 413 ? 'Request body is too large' : 'Something went wrong!',
     message: env.nodeEnvironment === 'development' ? err.message : undefined
   });
 });
 
-app.listen(env.port, () => {
-  console.log(`Server running on port ${env.port}`);
-  console.log(`Environment: ${env.nodeEnvironment}`);
-});
+if (require.main === module) {
+  app.listen(env.port, () => {
+    console.log(`Server running on port ${env.port}`);
+    console.log(`Environment: ${env.nodeEnvironment}`);
+  });
+}
