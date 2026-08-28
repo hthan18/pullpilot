@@ -1,441 +1,113 @@
-import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { authAPI, reviewAPI } from '../services/api';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { AppShell } from '../components/AppShell';
+import { EmptyState, LoadingState, PageHeader, StatCard, StatusPill } from '../components/ui';
+import { authAPI, repoAPI, reviewAPI } from '../services/api';
+import type { Repository, Review, ReviewCategory, ReviewFinding, ReviewSeverity, StructuredAnalysis, User } from '../types';
 
-interface ReviewFinding {
-  category: string;
-  severity: 'critical' | 'high' | 'medium' | 'low';
-  title: string;
-  file: string;
-  line: number | null;
-  description: string;
-  evidence: string;
-  suggestion: string;
-  confidence: number;
-}
+const severityOrder: Record<ReviewSeverity, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+const isStructured = (value: Review['analysis_result']): value is StructuredAnalysis => Boolean(value && Array.isArray((value as StructuredAnalysis).findings));
 
-interface StructuredAnalysis {
-  summary: string;
-  riskLevel: 'high' | 'medium' | 'low';
-  findings: ReviewFinding[];
-  metadata?: { analyzedFiles: string[]; skippedFiles: Array<{ file: string; reason: string }> };
+function markdownFor(review: Review, repository?: Repository) {
+  if (!isStructured(review.analysis_result)) return `# PullPilot review\n\nLegacy review for PR #${review.pr_number}.`;
+  const analysis = review.analysis_result;
+  return [`# PullPilot review: ${review.pr_title}`, '', `**Repository:** ${repository?.full_name || 'Unknown'}`, `**PR:** #${review.pr_number}`, `**Risk:** ${analysis.riskLevel}`, '', analysis.summary, '', '## Findings', '', ...analysis.findings.flatMap((finding) => [`### [${finding.severity.toUpperCase()}] ${finding.title}`, `- **Category:** ${finding.category}`, `- **Location:** \`${finding.file}${finding.line ? `:${finding.line}` : ''}\``, `- **Evidence:** ${finding.evidence}`, `- **Suggested fix:** ${finding.suggestion}`, `- **Confidence:** ${Math.round(finding.confidence * 100)}%`, ''])].join('\n');
 }
 
 export default function ReviewPage() {
-  const navigate = useNavigate();
   const { repoId } = useParams();
-  const [user, setUser] = useState<any>(null);
-  const [reviews, setReviews] = useState<any[]>([]);
+  const id = Number(repoId);
+  const [user, setUser] = useState<User | null>(null);
+  const [repository, setRepository] = useState<Repository>();
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [selectedId, setSelectedId] = useState<number | string | null>(null);
   const [prNumber, setPrNumber] = useState('');
+  const [query, setQuery] = useState('');
+  const [severity, setSeverity] = useState<'all' | ReviewSeverity>('all');
+  const [category, setCategory] = useState<'all' | ReviewCategory>('all');
   const [analyzing, setAnalyzing] = useState(false);
-  const [selectedReview, setSelectedReview] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 5000);
-    return () => clearInterval(interval);
-  }, [repoId]);
-
-  const loadData = async () => {
-  try {
-    const [userRes, reviewsRes] = await Promise.all([
-      authAPI.getCurrentUser(),
-      reviewAPI.getReviewsByRepo(Number(repoId)),
-    ]);
-
-    setUser(userRes.data);
-
-    const rawReviews = reviewsRes.data;
-    const uniqueMap: Record<string, any> = {};
-
-    for (const review of rawReviews) {
-      const key = `${review.pr_number}-${review.pr_title?.trim()}`;
-      const existing = uniqueMap[key];
-
-      if (
-        !existing ||
-        new Date(review.created_at).getTime() > new Date(existing.created_at).getTime()
-      ) {
-        uniqueMap[key] = review;
-      }
-    }
-
-    const uniqueReviews = Object.values(uniqueMap);
-
-    uniqueReviews.sort(
-      (a: any, b: any) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
-
-    setReviews(uniqueReviews);
-  } catch (error) {
-    console.error("Error loading data:", error);
-  } finally {
-    setLoading(false);
-  }
-};
-
-
-  const handleAnalyze = async () => {
-  if (!prNumber) {
-    alert("Please enter a PR number");
-    return;
-  }
-
-  // 🔍 Check if this PR already exists
-  const existingReview = reviews.find(
-    (r) => String(r.pr_number) === String(prNumber)
-  );
-
-  if (existingReview) {
-    const confirmReanalyze = window.confirm(
-      `A review for PR #${prNumber} already exists.\nDo you want to analyze it again?`
-    );
-    if (!confirmReanalyze) return;
-  }
-
-  setAnalyzing(true);
-  try {
-    const response = await reviewAPI.createReview({
-      repositoryId: Number(repoId),
-      prNumber: Number(prNumber),
-    });
-
-    setPrNumber("");
-    await loadData();
-    setSelectedReview(response.data);
-  } catch (error: any) {
-    console.error("Error creating review:", error);
-    if (error.response?.status === 404) {
-      alert("Pull request not found. Make sure the PR number is correct.");
-    } else {
-      alert("Failed to create review");
-    }
-  } finally {
-    setAnalyzing(false);
-  }
-};
-
-  const handleLogout = async () => {
+  const loadData = useCallback(async () => {
     try {
-      await authAPI.logout();
-    } finally {
-      navigate('/');
-    }
+      const [userRes, reviewRes, repoRes] = await Promise.all([authAPI.getCurrentUser(), reviewAPI.getReviewsByRepo(id), repoAPI.getConnectedRepos()]);
+      setUser(userRes.data as User);
+      setRepository((repoRes.data as Repository[]).find((repo) => String(repo.id) === String(id)));
+      const latest = new Map<string, Review>();
+      (reviewRes.data as Review[]).forEach((review) => {
+        const key = `${review.pr_number}-${review.pr_title.trim()}`;
+        const current = latest.get(key);
+        if (!current || Date.parse(review.created_at) > Date.parse(current.created_at)) latest.set(key, review);
+      });
+      const next = [...latest.values()].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+      setReviews(next);
+      setSelectedId((current) => current ?? next[0]?.id ?? null);
+    } catch (error) { console.error(error); setMessage('Could not load review history.'); }
+    finally { setLoading(false); }
+  }, [id]);
+
+  useEffect(() => { void loadData(); }, [loadData]);
+  useEffect(() => {
+    if (!reviews.some((review) => review.status === 'pending')) return;
+    const interval = window.setInterval(() => void loadData(), 4000);
+    return () => window.clearInterval(interval);
+  }, [reviews, loadData]);
+
+  const selected = reviews.find((review) => String(review.id) === String(selectedId));
+  const selectedAnalysis = selected && isStructured(selected.analysis_result) ? selected.analysis_result : null;
+  const findings = useMemo<ReviewFinding[]>(() => selectedAnalysis ? selectedAnalysis.findings.filter((finding) => {
+    const text = `${finding.title} ${finding.file} ${finding.description}`.toLowerCase();
+    return text.includes(query.toLowerCase()) && (severity === 'all' || finding.severity === severity) && (category === 'all' || finding.category === category);
+  }).sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]) : [], [selectedAnalysis, query, severity, category]);
+  const summary = useMemo(() => reviews.reduce((acc, review) => {
+    if (isStructured(review.analysis_result)) review.analysis_result.findings.forEach((finding) => { acc.total += 1; if (finding.severity === 'critical' || finding.severity === 'high') acc.high += 1; });
+    if (review.status === 'pending') acc.pending += 1;
+    return acc;
+  }, { total: 0, high: 0, pending: 0 }), [reviews]);
+
+  const analyze = async () => {
+    const number = Number(prNumber);
+    if (!Number.isInteger(number) || number < 1) { setMessage('Enter a valid pull request number.'); return; }
+    if (reviews.some((review) => review.pr_number === number) && !window.confirm(`Run a fresh analysis for PR #${number}?`)) return;
+    setAnalyzing(true); setMessage(null);
+    try { const response = await reviewAPI.createReview({ repositoryId: id, prNumber: number }); setSelectedId((response.data as Review).id); setPrNumber(''); await loadData(); setMessage(`PR #${number} is queued for review.`); }
+    catch (error) { console.error(error); setMessage('Could not start the review. Confirm that the PR number exists and try again.'); }
+    finally { setAnalyzing(false); }
   };
+  const copyReview = async () => { if (!selected) return; await navigator.clipboard.writeText(markdownFor(selected, repository)); setMessage('Review copied as Markdown.'); };
+  const downloadReview = () => { if (!selected) return; const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([markdownFor(selected, repository)], { type: 'text/markdown' })); link.download = `pullpilot-${repository?.name || 'review'}-pr-${selected.pr_number}.md`; link.click(); URL.revokeObjectURL(link.href); };
 
-  const renderAnalysis = (review: any) => {
-    if (review.status === 'pending') {
-      return (
-        <div style={{ padding: '24px', textAlign: 'center' }}>
-          <div style={{ marginBottom: '16px' }}>
-            <div style={{
-              width: '40px',
-              height: '40px',
-              border: '4px solid #374151',
-              borderTopColor: '#3b82f6',
-              borderRadius: '50%',
-              margin: '0 auto',
-              animation: 'spin 1s linear infinite'
-            }}></div>
-          </div>
-          <p style={{ color: '#9ca3af' }}>AI is analyzing the code... This may take 30-60 seconds.</p>
-        </div>
-      );
-    }
-
-    if (review.status === 'failed') {
-      return (
-        <div style={{ padding: '24px', textAlign: 'center' }}>
-          <p style={{ color: '#ef4444' }}>Analysis failed: {review.error_message || 'Please try again.'}</p>
-        </div>
-      );
-    }
-
-    if (!review.analysis_result) {
-      return null;
-    }
-
-    const analysis = typeof review.analysis_result === 'string' 
-      ? JSON.parse(review.analysis_result) 
-      : review.analysis_result;
-
-    if (Array.isArray(analysis.findings)) {
-      const structured = analysis as StructuredAnalysis;
-      const severityColor: Record<ReviewFinding['severity'], string> = {
-        critical: '#dc2626', high: '#ef4444', medium: '#f59e0b', low: '#3b82f6'
-      };
-      return (
-        <div style={{ padding: '24px' }}>
-          <div style={{ background: '#111827', padding: '16px', borderRadius: '6px', marginBottom: '20px' }}>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '8px' }}>
-              <strong style={{ color: 'white' }}>Risk: {structured.riskLevel}</strong>
-              {review.model && <span style={{ color: '#9ca3af', fontSize: '12px' }}>{review.model}</span>}
-            </div>
-            <p style={{ color: '#d1d5db', margin: 0 }}>{structured.summary}</p>
-            <p style={{ color: '#6b7280', fontSize: '12px', marginBottom: 0 }}>
-              {review.files_reviewed ?? structured.metadata?.analyzedFiles.length ?? 0} files reviewed · {review.files_skipped ?? structured.metadata?.skippedFiles.length ?? 0} skipped
-              {review.input_tokens != null && ` · ${review.input_tokens + (review.output_tokens || 0)} tokens`}
-            </p>
-          </div>
-          {structured.findings.length === 0 ? (
-            <p style={{ color: '#10b981' }}>No concrete issues found in the reviewed changes.</p>
-          ) : structured.findings.map((finding, idx) => (
-            <div key={`${finding.file}-${finding.line}-${idx}`} style={{ background: '#111827', padding: '16px', borderRadius: '6px', marginBottom: '12px', borderLeft: `3px solid ${severityColor[finding.severity]}` }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
-                <strong style={{ color: 'white' }}>{finding.title}</strong>
-                <span style={{ color: severityColor[finding.severity], fontSize: '12px', textTransform: 'uppercase' }}>{finding.severity} · {finding.category}</span>
-              </div>
-              <p style={{ color: '#60a5fa', fontFamily: 'monospace', fontSize: '13px' }}>{finding.file}{finding.line ? `:${finding.line}` : ''}</p>
-              <p style={{ color: '#d1d5db' }}>{finding.description}</p>
-              <p style={{ color: '#9ca3af', fontSize: '14px' }}><strong>Evidence:</strong> {finding.evidence}</p>
-              <p style={{ color: '#9ca3af', fontSize: '14px', marginBottom: 0 }}><strong>Suggested fix:</strong> {finding.suggestion} ({Math.round(finding.confidence * 100)}% confidence)</p>
-            </div>
-          ))}
-        </div>
-      );
-    }
-
-    return (
-      <div style={{ padding: '24px' }}>
-        {analysis.security && analysis.security.length > 0 && (
-          <div style={{ marginBottom: '24px' }}>
-            <h4 style={{ color: 'white', fontSize: '16px', fontWeight: '600', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ color: '#ef4444' }}>🔴</span> Security Issues
-            </h4>
-            {analysis.security.map((item: any, idx: number) => (
-              <div key={idx} style={{ background: '#1f2937', padding: '12px', borderRadius: '6px', marginBottom: '8px', borderLeft: '3px solid #ef4444' }}>
-                <p style={{ color: 'white', fontWeight: '500', marginBottom: '4px' }}>{item.issue}</p>
-                <p style={{ color: '#9ca3af', fontSize: '14px', margin: 0 }}>{item.description}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {analysis.quality && analysis.quality.length > 0 && (
-          <div style={{ marginBottom: '24px' }}>
-            <h4 style={{ color: 'white', fontSize: '16px', fontWeight: '600', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ color: '#f59e0b' }}>🟡</span> Code Quality
-            </h4>
-            {analysis.quality.map((item: any, idx: number) => (
-              <div key={idx} style={{ background: '#1f2937', padding: '12px', borderRadius: '6px', marginBottom: '8px', borderLeft: '3px solid #f59e0b' }}>
-                <p style={{ color: 'white', fontWeight: '500', marginBottom: '4px' }}>{item.issue}</p>
-                <p style={{ color: '#9ca3af', fontSize: '14px', margin: 0 }}>{item.description}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {analysis.bestPractices && analysis.bestPractices.length > 0 && (
-          <div style={{ marginBottom: '24px' }}>
-            <h4 style={{ color: 'white', fontSize: '16px', fontWeight: '600', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ color: '#3b82f6' }}>🔵</span> Best Practices
-            </h4>
-            {analysis.bestPractices.map((item: any, idx: number) => (
-              <div key={idx} style={{ background: '#1f2937', padding: '12px', borderRadius: '6px', marginBottom: '8px', borderLeft: '3px solid #3b82f6' }}>
-                <p style={{ color: 'white', fontWeight: '500', marginBottom: '4px' }}>{item.issue}</p>
-                <p style={{ color: '#9ca3af', fontSize: '14px', margin: 0 }}>{item.description}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {analysis.suggestions && analysis.suggestions.length > 0 && (
-          <div>
-            <h4 style={{ color: 'white', fontSize: '16px', fontWeight: '600', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ color: '#10b981' }}>💡</span> Suggestions
-            </h4>
-            {analysis.suggestions.map((item: any, idx: number) => (
-              <div key={idx} style={{ background: '#1f2937', padding: '12px', borderRadius: '6px', marginBottom: '8px', borderLeft: '3px solid #10b981' }}>
-                <p style={{ color: 'white', fontWeight: '500', marginBottom: '4px' }}>{item.issue}</p>
-                <p style={{ color: '#9ca3af', fontSize: '14px', margin: 0 }}>{item.description}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {analysis.rawAnalysis && (
-          <div>
-            <h4 style={{ color: 'white', fontSize: '16px', fontWeight: '600', marginBottom: '12px' }}>Analysis</h4>
-            <div style={{ background: '#1f2937', padding: '16px', borderRadius: '6px', whiteSpace: 'pre-wrap' }}>
-              <p style={{ color: '#d1d5db', fontSize: '14px', margin: 0 }}>{analysis.rawAnalysis}</p>
-            </div>
-          </div>
-        )}
+  if (loading) return <LoadingState label="Loading review workspace" />;
+  return <AppShell user={user}>
+    <PageHeader eyebrow={repository?.full_name || 'Repository'} title="Review workspace" description="Run evidence-backed PR analysis, triage findings, and export results." actions={<>{repository && <a className="button" href={repository.url || `https://github.com/${repository.full_name}`} target="_blank" rel="noreferrer">View GitHub ↗</a>}<Link className="button" to="/repositories">All repositories</Link></>} />
+    {message && <div className="notice" role="status">{message}</div>}
+    <section className="stats-grid review-stats"><StatCard label="Reviews" value={reviews.length} detail="Unique pull requests" tone="blue" /><StatCard label="Findings" value={summary.total} detail="Across current reviews" tone="violet" /><StatCard label="High priority" value={summary.high} detail="Critical or high severity" tone="amber" /><StatCard label="In progress" value={summary.pending} detail="Actively analyzing" tone="green" /></section>
+    <section className="review-layout">
+      <aside className="review-rail panel">
+        <div className="panel-header"><div><h2>Review history</h2><p>{reviews.length} pull requests</p></div></div>
+        <div className="new-review"><label>Pull request number</label><div><input type="number" min="1" value={prNumber} onChange={(event) => setPrNumber(event.target.value)} placeholder="e.g. 42" onKeyDown={(event) => event.key === 'Enter' && void analyze()} /><button className="button primary" disabled={analyzing || !prNumber} onClick={() => void analyze()}>{analyzing ? '…' : 'Run'}</button></div></div>
+        <div className="review-list">{reviews.length === 0 ? <EmptyState title="No reviews yet" description="Enter a pull request number to run the first review." /> : reviews.map((review) => {
+          const analysis = isStructured(review.analysis_result) ? review.analysis_result : null;
+          return <button key={review.id} className={`review-list-item ${selectedId === review.id ? 'selected' : ''}`} onClick={() => setSelectedId(review.id)}><span className="review-number">#{review.pr_number}</span><span className="review-list-copy"><strong>{review.pr_title}</strong><small>{new Date(review.created_at).toLocaleString()}</small><span><StatusPill status={review.model ? (analysis?.riskLevel || review.status) : review.status} />{!review.model && review.status === 'completed' && <em>Legacy</em>}</span></span></button>;
+        })}</div>
+      </aside>
+      <div className="review-detail panel">
+        {!selected ? <EmptyState title="Select a review" description="Choose a pull request from the history to inspect its findings." /> : <>
+          <div className="review-detail-head"><div><div className="review-title-line"><span>PR #{selected.pr_number}</span><StatusPill status={selected.status} /></div><h2>{selected.pr_title}</h2><p>{repository?.full_name}</p></div><div className="review-actions"><button className="button small" onClick={() => void copyReview()}>Copy Markdown</button><button className="button small" onClick={downloadReview}>Export</button>{repository && <a className="button small" href={`https://github.com/${repository.full_name}/pull/${selected.pr_number}`} target="_blank" rel="noreferrer">Open PR ↗</a>}</div></div>
+          {selected.status === 'pending' ? <LoadingState label="AI is reviewing changed files" /> : selected.status === 'failed' ? <EmptyState icon="!" title="Review failed" description={selected.error_message || 'Try running this review again.'} /> : !isStructured(selected.analysis_result) ? <div className="legacy-review"><StatusPill status="Legacy demo" /><h3>This is a pre-AI demo result</h3><p>Run this PR again to replace the stored mock findings with an evidence-backed review.</p><button className="button primary" onClick={() => { setPrNumber(String(selected.pr_number)); }}>Prepare reanalysis</button></div> : <StructuredReview review={selected} repository={repository} findings={findings} query={query} setQuery={setQuery} severity={severity} setSeverity={setSeverity} category={category} setCategory={setCategory} />}
+        </>}
       </div>
-    );
-  };
+    </section>
+  </AppShell>;
+}
 
-  if (loading) {
-    return (
-      <div style={{ minHeight: '100vh', background: '#111827', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ color: 'white' }}>Loading...</div>
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ minHeight: '100vh', background: '#111827' }}>
-      <style>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
-
-      {/* Navbar */}
-      <nav style={{ background: '#1f2937', borderBottom: '1px solid #374151' }}>
-        <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 24px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', height: '64px', alignItems: 'center' }}>
-            <Link to="/dashboard" style={{ fontSize: '20px', fontWeight: 'bold', color: 'white', textDecoration: 'none' }}>
-              PullPilot
-            </Link>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <Link to="/dashboard" style={{ color: '#d1d5db', textDecoration: 'none', padding: '8px 12px', fontSize: '14px' }}>
-                Dashboard
-              </Link>
-              <Link to="/repositories" style={{ color: '#d1d5db', textDecoration: 'none', padding: '8px 12px', fontSize: '14px' }}>
-                Repositories
-              </Link>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <img src={user?.avatar_url} alt={user?.username} style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
-                <span style={{ color: '#d1d5db', fontSize: '14px' }}>{user?.username}</span>
-                <button onClick={handleLogout} style={{ color: '#9ca3af', background: 'none', border: 'none', fontSize: '14px', cursor: 'pointer' }}>
-                  Logout
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      {/* Main Content */}
-      <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '32px 24px' }}>
-        <div style={{ marginBottom: '32px' }}>
-          <Link to="/repositories" style={{ color: '#3b82f6', textDecoration: 'none', fontSize: '14px', marginBottom: '8px', display: 'inline-block' }}>
-            ← Back to Repositories
-          </Link>
-          <h2 style={{ fontSize: '30px', fontWeight: 'bold', color: 'white', marginBottom: '8px' }}>
-            Code Reviews
-          </h2>
-          <p style={{ color: '#9ca3af' }}>
-            Analyze pull requests with AI-powered code review
-          </p>
-        </div>
-
-        {/* Analyze New PR */}
-        <div style={{ background: '#1f2937', borderRadius: '8px', padding: '24px', border: '1px solid #374151', marginBottom: '32px' }}>
-          <h3 style={{ color: 'white', fontSize: '18px', fontWeight: '600', marginBottom: '16px' }}>
-            Analyze New Pull Request
-          </h3>
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <input
-              type="number"
-              placeholder="Enter PR number (e.g., 42)"
-              value={prNumber}
-              onChange={(e) => setPrNumber(e.target.value)}
-              style={{
-                flex: 1,
-                padding: '10px 16px',
-                background: '#111827',
-                border: '1px solid #374151',
-                borderRadius: '8px',
-                color: 'white',
-                fontSize: '14px'
-              }}
-            />
-            <button
-              onClick={handleAnalyze}
-              disabled={analyzing || !prNumber}
-              style={{
-                background: '#2563eb',
-                color: 'white',
-                padding: '10px 24px',
-                borderRadius: '8px',
-                fontSize: '14px',
-                fontWeight: '500',
-                border: 'none',
-                cursor: analyzing || !prNumber ? 'not-allowed' : 'pointer',
-                opacity: analyzing || !prNumber ? 0.5 : 1
-              }}
-            >
-              {analyzing ? 'Analyzing...' : 'Analyze PR'}
-            </button>
-          </div>
-          <p style={{ color: '#6b7280', fontSize: '12px', marginTop: '8px', margin: 0 }}>
-            Enter the pull request number from GitHub to analyze
-          </p>
-        </div>
-
-        {/* Reviews List */}
-        <div>
-          <h3 style={{ color: 'white', fontSize: '20px', fontWeight: '600', marginBottom: '16px' }}>
-            Review History
-          </h3>
-          {reviews.length === 0 ? (
-            <div style={{ background: '#1f2937', borderRadius: '8px', padding: '48px', border: '1px solid #374151', textAlign: 'center' }}>
-              <p style={{ color: '#9ca3af', marginBottom: '8px' }}>No reviews yet</p>
-              <p style={{ color: '#6b7280', fontSize: '14px' }}>Analyze your first pull request to see AI-powered insights</p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {reviews.map((review) => (
-                <div key={review.id} style={{ background: '#1f2937', borderRadius: '8px', border: '1px solid #374151', overflow: 'hidden' }}>
-                  <div
-                    onClick={() => setSelectedReview(selectedReview?.id === review.id ? null : review)}
-                    style={{
-                      padding: '20px 24px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
-                    }}
-                  >
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
-                        <h4 style={{ color: 'white', fontSize: '16px', fontWeight: '500', margin: 0 }}>
-                          PR #{review.pr_number}: {review.pr_title}
-                        </h4>
-                        <span style={{
-                          fontSize: '12px',
-                          padding: '2px 8px',
-                          borderRadius: '12px',
-                          background: review.status === 'completed' ? '#10b981' : review.status === 'failed' ? '#ef4444' : '#f59e0b',
-                          color: 'white'
-                        }}>
-                          {review.status}
-                        </span>
-                      </div>
-                      <p style={{ color: '#9ca3af', fontSize: '14px', margin: 0 }}>
-                        {new Date(review.created_at).toLocaleString()}
-                      </p>
-                    </div>
-                    <svg
-                      style={{
-                        width: '20px',
-                        height: '20px',
-                        color: '#9ca3af',
-                        transform: selectedReview?.id === review.id ? 'rotate(180deg)' : 'rotate(0deg)',
-                        transition: 'transform 0.2s'
-                      }}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </div>
-                  {selectedReview?.id === review.id && (
-                    <div style={{ borderTop: '1px solid #374151' }}>
-                      {renderAnalysis(review)}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+function StructuredReview({ review, repository, findings, query, setQuery, severity, setSeverity, category, setCategory }: { review: Review; repository?: Repository; findings: ReviewFinding[]; query: string; setQuery: (value: string) => void; severity: 'all' | ReviewSeverity; setSeverity: (value: 'all' | ReviewSeverity) => void; category: 'all' | ReviewCategory; setCategory: (value: 'all' | ReviewCategory) => void }) {
+  const analysis = review.analysis_result as StructuredAnalysis;
+  return <div className="structured-review">
+    <div className="review-summary"><div><StatusPill status={`${analysis.riskLevel} risk`} /><h3>{analysis.summary}</h3></div><dl><div><dt>Model</dt><dd>{review.model}</dd></div><div><dt>Files</dt><dd>{review.files_reviewed || 0} reviewed · {review.files_skipped || 0} skipped</dd></div><div><dt>Tokens</dt><dd>{((review.input_tokens || 0) + (review.output_tokens || 0)).toLocaleString()}</dd></div></dl></div>
+    <div className="finding-toolbar"><label className="search-box"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search findings or files..." /></label><select className="select" value={severity} onChange={(event) => setSeverity(event.target.value as 'all' | ReviewSeverity)}><option value="all">All severities</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select><select className="select" value={category} onChange={(event) => setCategory(event.target.value as 'all' | ReviewCategory)}><option value="all">All categories</option><option value="security">Security</option><option value="correctness">Correctness</option><option value="reliability">Reliability</option><option value="performance">Performance</option><option value="maintainability">Maintainability</option></select></div>
+    <div className="findings-head"><h3>{findings.length} findings</h3><span>Sorted by severity</span></div>
+    {findings.length === 0 ? <EmptyState icon="✓" title="No matching findings" description="Adjust the filters or search term." /> : <div className="finding-list">{findings.map((finding, index) => <article className={`finding-card severity-${finding.severity}`} key={`${finding.file}-${finding.line}-${index}`}><div className="finding-top"><div><StatusPill status={finding.severity} /><span className="category-label">{finding.category}</span></div><span className="confidence">{Math.round(finding.confidence * 100)}% confidence</span></div><h3>{finding.title}</h3>{repository ? <a className="file-link" href={`https://github.com/${repository.full_name}/pull/${review.pr_number}/files`} target="_blank" rel="noreferrer">{finding.file}{finding.line ? `:${finding.line}` : ''} ↗</a> : <span className="file-link">{finding.file}{finding.line ? `:${finding.line}` : ''}</span>}<p>{finding.description}</p><details><summary>Evidence and suggested fix</summary><div className="evidence-grid"><div><span>Evidence</span><p>{finding.evidence}</p></div><div><span>Suggested fix</span><p>{finding.suggestion}</p></div></div></details></article>)}</div>}
+  </div>;
 }

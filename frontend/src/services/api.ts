@@ -1,4 +1,5 @@
 import axios from 'axios';
+import type { GitHubRepository } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
 
@@ -24,15 +25,15 @@ export const authAPI = {
 export const repoAPI = {
   getGitHubRepos: () => api.get('/repositories/github'),
   getConnectedRepos: () => api.get('/repositories'),
-  connectRepo: (repo: any) => api.post('/repositories', repo),
-  disconnectRepo: (id: number) => api.delete(`/repositories/${id}`),
+  connectRepo: (repo: GitHubRepository) => api.post('/repositories', repo),
+  disconnectRepo: (id: number | string) => api.delete(`/repositories/${id}`),
 };
 
 // --- REVIEWS ---
 export const reviewAPI = {
-  getReviewsByRepo: (repoId: number) => api.get(`/reviews/repository/${repoId}`),
+  getReviewsByRepo: (repoId: number | string) => api.get(`/reviews/repository/${repoId}`),
   createReview: (data: { repositoryId: number; prNumber: number }) => api.post('/reviews', data),
-  getReview: (id: number) => api.get(`/reviews/${id}`),
+  getReview: (id: number | string) => api.get(`/reviews/${id}`),
 };
 
 export const issueAPI = {
