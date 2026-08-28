@@ -6,6 +6,7 @@ import { generateReview } from '../reviews/openaiReviewer';
 import { prepareDiff } from '../reviews/prepareDiff';
 import { GitHubPullRequestFile } from '../reviews/types';
 import { decryptToken } from '../security/tokenEncryption';
+import { reviewCreationRateLimit } from '../middleware/rateLimits';
 
 const router = express.Router();
 router.use(authenticateToken);
@@ -29,7 +30,7 @@ router.get('/repository/:repoId', async (req: AuthRequest, res) => {
   }
 });
 
-router.post('/', async (req: AuthRequest, res) => {
+router.post('/', reviewCreationRateLimit, async (req: AuthRequest, res) => {
   const repositoryId = positiveInteger(req.body.repositoryId);
   const prNumber = positiveInteger(req.body.prNumber);
   if (!repositoryId || !prNumber) return res.status(400).json({ error: 'repositoryId and prNumber must be positive integers' });

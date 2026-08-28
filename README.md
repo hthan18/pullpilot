@@ -108,6 +108,14 @@ npm run lint
 
 The processor currently runs asynchronously inside the API process. A production deployment should move it to a durable queue so a restart cannot strand a pending review.
 
+## API protection
+
+- All API routes are limited to 150 requests per IP every 15 minutes.
+- GitHub OAuth endpoints are limited to 20 requests per IP every 15 minutes.
+- AI review creation is limited to 10 requests per IP per hour.
+- JSON request bodies are capped at 100 KB and Express technology headers are disabled.
+- The current in-memory limiter is appropriate for one API instance. Use a shared rate-limit store before scaling the backend horizontally.
+
 ## Known revival work
 
 - Repair existing frontend lint errors and add shared TypeScript models.
