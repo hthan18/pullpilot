@@ -2,7 +2,7 @@
 
 PullPilot is a full-stack proof of concept for reviewing GitHub pull requests. Users authenticate with GitHub, connect repositories, select a pull request, and view categorized review findings.
 
-> Current status: GitHub authentication, repository access, pull-request retrieval, persistence, and the review interface are implemented. The review engine currently returns demo findings and does not yet perform real AI analysis.
+> Current status: GitHub authentication, repository access, pull-request retrieval, persistence, and evidence-based OpenAI review are implemented.
 
 ## Architecture
 
@@ -47,6 +47,8 @@ http://localhost:5000/api/auth/github/callback
 
 Never commit `.env`, `.env.local`, OAuth secrets, database passwords, access tokens, or JWT secrets.
 
+Create an OpenAI API key and set `OPENAI_API_KEY` in `backend/.env`. `OPENAI_MODEL` defaults to `gpt-5.4-mini` and can be overridden there.
+
 For production, generate a separate GitHub-token encryption key and set `TOKEN_ENCRYPTION_KEY`:
 
 ```powershell
@@ -64,7 +66,7 @@ npm run db:check
 npm run db:migrate
 ```
 
-The initial migration is idempotent and creates the tables and indexes required by the existing API queries.
+The migrations are idempotent and create the application tables plus review model, token-usage, file-count, timing, and failure metadata.
 
 ## 4. Run locally
 
@@ -96,9 +98,18 @@ npm run build
 npm run lint
 ```
 
+## Review pipeline
+
+- PullPilot fetches up to 100 changed-file patches from GitHub.
+- Deleted, binary, generated, built, minified, and dependency-lock files are skipped.
+- Individual patches and total prompt size are capped before being sent to OpenAI.
+- The model must return a strict JSON schema with evidence, severity, category, file, optional line, remediation, and confidence.
+- Model name, token usage, reviewed/skipped file counts, and failures are saved with each review.
+
+The processor currently runs asynchronously inside the API process. A production deployment should move it to a durable queue so a restart cannot strand a pending review.
+
 ## Known revival work
 
-- Replace the hard-coded demo analysis with a real, validated review pipeline.
 - Repair existing frontend lint errors and add shared TypeScript models.
 - Harden GitHub OAuth and stop returning session tokens through URLs.
 - Encrypt or replace stored GitHub access tokens, preferably with a GitHub App installation flow.

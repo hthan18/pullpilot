@@ -2,6 +2,25 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { authAPI, reviewAPI } from '../services/api';
 
+interface ReviewFinding {
+  category: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  title: string;
+  file: string;
+  line: number | null;
+  description: string;
+  evidence: string;
+  suggestion: string;
+  confidence: number;
+}
+
+interface StructuredAnalysis {
+  summary: string;
+  riskLevel: 'high' | 'medium' | 'low';
+  findings: ReviewFinding[];
+  metadata?: { analyzedFiles: string[]; skippedFiles: Array<{ file: string; reason: string }> };
+}
+
 export default function ReviewPage() {
   const navigate = useNavigate();
   const { repoId } = useParams();
@@ -129,7 +148,7 @@ export default function ReviewPage() {
     if (review.status === 'failed') {
       return (
         <div style={{ padding: '24px', textAlign: 'center' }}>
-          <p style={{ color: '#ef4444' }}>Analysis failed. Please try again.</p>
+          <p style={{ color: '#ef4444' }}>Analysis failed: {review.error_message || 'Please try again.'}</p>
         </div>
       );
     }
@@ -141,6 +160,42 @@ export default function ReviewPage() {
     const analysis = typeof review.analysis_result === 'string' 
       ? JSON.parse(review.analysis_result) 
       : review.analysis_result;
+
+    if (Array.isArray(analysis.findings)) {
+      const structured = analysis as StructuredAnalysis;
+      const severityColor: Record<ReviewFinding['severity'], string> = {
+        critical: '#dc2626', high: '#ef4444', medium: '#f59e0b', low: '#3b82f6'
+      };
+      return (
+        <div style={{ padding: '24px' }}>
+          <div style={{ background: '#111827', padding: '16px', borderRadius: '6px', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '8px' }}>
+              <strong style={{ color: 'white' }}>Risk: {structured.riskLevel}</strong>
+              {review.model && <span style={{ color: '#9ca3af', fontSize: '12px' }}>{review.model}</span>}
+            </div>
+            <p style={{ color: '#d1d5db', margin: 0 }}>{structured.summary}</p>
+            <p style={{ color: '#6b7280', fontSize: '12px', marginBottom: 0 }}>
+              {review.files_reviewed ?? structured.metadata?.analyzedFiles.length ?? 0} files reviewed · {review.files_skipped ?? structured.metadata?.skippedFiles.length ?? 0} skipped
+              {review.input_tokens != null && ` · ${review.input_tokens + (review.output_tokens || 0)} tokens`}
+            </p>
+          </div>
+          {structured.findings.length === 0 ? (
+            <p style={{ color: '#10b981' }}>No concrete issues found in the reviewed changes.</p>
+          ) : structured.findings.map((finding, idx) => (
+            <div key={`${finding.file}-${finding.line}-${idx}`} style={{ background: '#111827', padding: '16px', borderRadius: '6px', marginBottom: '12px', borderLeft: `3px solid ${severityColor[finding.severity]}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
+                <strong style={{ color: 'white' }}>{finding.title}</strong>
+                <span style={{ color: severityColor[finding.severity], fontSize: '12px', textTransform: 'uppercase' }}>{finding.severity} · {finding.category}</span>
+              </div>
+              <p style={{ color: '#60a5fa', fontFamily: 'monospace', fontSize: '13px' }}>{finding.file}{finding.line ? `:${finding.line}` : ''}</p>
+              <p style={{ color: '#d1d5db' }}>{finding.description}</p>
+              <p style={{ color: '#9ca3af', fontSize: '14px' }}><strong>Evidence:</strong> {finding.evidence}</p>
+              <p style={{ color: '#9ca3af', fontSize: '14px', marginBottom: 0 }}><strong>Suggested fix:</strong> {finding.suggestion} ({Math.round(finding.confidence * 100)}% confidence)</p>
+            </div>
+          ))}
+        </div>
+      );
+    }
 
     return (
       <div style={{ padding: '24px' }}>
