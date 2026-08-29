@@ -25,7 +25,7 @@ router.get('/github', oauthRateLimit, (req, res) => {
 
   githubAuthUrl.searchParams.set('client_id', env.githubClientId);
   githubAuthUrl.searchParams.set('redirect_uri', redirectUri);
-  githubAuthUrl.searchParams.set('scope', 'read:user user:email');
+  githubAuthUrl.searchParams.set('scope', 'read:user user:email public_repo');
   githubAuthUrl.searchParams.set('state', state);
 
   res.cookie(OAUTH_STATE_COOKIE, state, oauthStateCookieOptions);

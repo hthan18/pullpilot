@@ -6,6 +6,13 @@ import { decryptToken } from '../security/tokenEncryption';
 
 const router = express.Router();
 
+const severities = new Set(['critical', 'high', 'medium', 'low']);
+
+function positiveInteger(value: unknown): number | null {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
 // All routes require authentication
 router.use(authenticateToken);
 
@@ -87,6 +94,40 @@ router.post('/', async (req: AuthRequest, res) => {
   } catch (error) {
     console.error('Error connecting repository:', error);
     res.status(500).json({ error: 'Failed to connect repository' });
+  }
+});
+
+// Update repository-specific review policy.
+router.patch('/:id/settings', async (req: AuthRequest, res) => {
+  const id = positiveInteger(req.params.id);
+  if (!id) return res.status(400).json({ error: 'Invalid repository ID' });
+
+  const reviewInstructions = typeof req.body.review_instructions === 'string'
+    ? req.body.review_instructions.trim()
+    : '';
+  const minimumConfidence = Number(req.body.minimum_confidence);
+  const minimumSeverity = req.body.minimum_severity;
+  const postToGithub = req.body.post_to_github;
+
+  if (reviewInstructions.length > 4000) return res.status(400).json({ error: 'Review instructions must be 4,000 characters or fewer' });
+  if (!Number.isFinite(minimumConfidence) || minimumConfidence < 0.5 || minimumConfidence > 1) {
+    return res.status(400).json({ error: 'Minimum confidence must be between 0.5 and 1' });
+  }
+  if (!severities.has(minimumSeverity)) return res.status(400).json({ error: 'Invalid minimum severity' });
+  if (typeof postToGithub !== 'boolean') return res.status(400).json({ error: 'post_to_github must be a boolean' });
+
+  try {
+    const result = await pool.query(
+      `UPDATE repositories SET review_instructions = $1, minimum_confidence = $2,
+       minimum_severity = $3, post_to_github = $4, updated_at = NOW()
+       WHERE id = $5 AND user_id = $6 RETURNING *`,
+      [reviewInstructions, minimumConfidence, minimumSeverity, postToGithub, id, req.userId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Repository not found' });
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating repository settings:', error);
+    res.status(500).json({ error: 'Failed to update repository settings' });
   }
 });
 

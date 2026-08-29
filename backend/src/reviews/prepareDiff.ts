@@ -4,11 +4,25 @@ const MAX_FILES = 100;
 const MAX_PATCH_CHARS_PER_FILE = 12_000;
 const MAX_TOTAL_CHARS = 60_000;
 const ignoredFile = /(^|\/)(dist|build|coverage|vendor|generated)(\/|$)|(?:\.min\.(?:js|css)|package-lock\.json|yarn\.lock|pnpm-lock\.yaml)$/i;
+const hunkHeader = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/;
+
+function changedLineNumbers(patch: string): number[] {
+  const changed: number[] = [];
+  let newLine = 0;
+  for (const line of patch.split('\n')) {
+    const hunk = line.match(hunkHeader);
+    if (hunk) { newLine = Number(hunk[1]); continue; }
+    if (line.startsWith('+') && !line.startsWith('+++')) { changed.push(newLine); newLine += 1; }
+    else if (!line.startsWith('-')) newLine += 1;
+  }
+  return changed;
+}
 
 export function prepareDiff(files: GitHubPullRequestFile[]): PreparedDiff {
   const analyzedFiles: string[] = [];
   const skippedFiles: Array<{ file: string; reason: string }> = [];
   const sections: string[] = [];
+  const changedLines: Record<string, number[]> = {};
   let totalChars = 0;
 
   for (const file of files.slice(0, MAX_FILES)) {
@@ -29,6 +43,7 @@ export function prepareDiff(files: GitHubPullRequestFile[]): PreparedDiff {
     const section = `FILE: ${file.filename}\nSTATUS: ${file.status}\nCHANGES: +${file.additions} -${file.deletions}\nPATCH:\n${patch}${truncated}`;
     sections.push(section);
     analyzedFiles.push(file.filename);
+    changedLines[file.filename] = changedLineNumbers(patch);
     totalChars += patch.length;
   }
 
@@ -38,5 +53,5 @@ export function prepareDiff(files: GitHubPullRequestFile[]): PreparedDiff {
     }
   }
 
-  return { prompt: sections.join('\n\n---\n\n'), analyzedFiles, skippedFiles };
+  return { prompt: sections.join('\n\n---\n\n'), analyzedFiles, skippedFiles, changedLines };
 }

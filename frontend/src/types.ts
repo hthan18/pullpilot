@@ -22,6 +22,8 @@ export interface Repository extends GitHubRepository {
   auto_review?: boolean;
   post_to_github?: boolean;
   minimum_severity?: ReviewSeverity;
+  minimum_confidence?: number | string;
+  review_instructions?: string;
 }
 
 export type ReviewStatus = 'pending' | 'completed' | 'failed';
@@ -44,7 +46,27 @@ export interface StructuredAnalysis {
   summary: string;
   riskLevel: 'high' | 'medium' | 'low';
   findings: ReviewFinding[];
-  metadata?: { analyzedFiles: string[]; skippedFiles: Array<{ file: string; reason: string }> };
+  metadata?: {
+    analyzedFiles: string[];
+    skippedFiles: Array<{ file: string; reason: string }>;
+    validation?: { generated: number; accepted: number; rejected: number; reasons: Record<string, number> };
+  };
+}
+
+export interface FindingFeedback {
+  id: number | string;
+  review_id: number | string;
+  finding_key: string;
+  disposition: 'accepted' | 'dismissed';
+  reason?: string | null;
+}
+
+export interface ReviewAnalytics {
+  reviews: number;
+  rated_findings: number;
+  accepted: number;
+  dismissed: number;
+  acceptance_rate: number | null;
 }
 
 export interface Review {

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { EmptyState, LoadingState, PageHeader, StatCard, StatusPill } from '../components/ui';
 import { authAPI, repoAPI, reviewAPI } from '../services/api';
-import type { Repository, Review, StructuredAnalysis, User } from '../types';
+import type { Repository, Review, ReviewAnalytics, StructuredAnalysis, User } from '../types';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -11,13 +11,15 @@ export default function Dashboard() {
   const [repos, setRepos] = useState<Repository[]>([]);
   const [reviews, setReviews] = useState<Array<Review & { repositoryName: string }>>([]);
   const [loading, setLoading] = useState(true);
+  const [quality, setQuality] = useState<ReviewAnalytics | null>(null);
 
   const loadData = useCallback(async () => {
     try {
-      const [userRes, reposRes] = await Promise.all([authAPI.getCurrentUser(), repoAPI.getConnectedRepos()]);
+      const [userRes, reposRes, analyticsRes] = await Promise.all([authAPI.getCurrentUser(), repoAPI.getConnectedRepos(), reviewAPI.getAnalytics()]);
       const connected = (reposRes.data as Repository[]).filter((repo) => repo.is_active);
       setUser(userRes.data as User);
       setRepos(connected);
+      setQuality(analyticsRes.data as ReviewAnalytics);
       const reviewGroups = await Promise.all(connected.map(async (repo) => {
         try {
           const response = await reviewAPI.getReviewsByRepo(repo.id);
@@ -55,7 +57,7 @@ export default function Dashboard() {
         <StatCard label="Connected repos" value={repos.length} detail="Actively monitored" tone="blue" />
         <StatCard label="AI reviews" value={reviews.length} detail="Across all repositories" tone="green" />
         <StatCard label="Findings" value={stats.findings} detail={`${stats.highRisk} high-risk reviews`} tone="amber" />
-        <StatCard label="Tokens analyzed" value={stats.tokens.toLocaleString()} detail="Recorded model usage" tone="violet" />
+        <StatCard label="Acceptance rate" value={quality?.acceptance_rate === null || quality?.acceptance_rate === undefined ? '—' : `${quality.acceptance_rate}%`} detail={quality?.rated_findings ? `${quality.rated_findings} rated findings` : 'Rate findings to measure quality'} tone="violet" />
       </section>
       <section className="split-grid">
         <div className="panel">
